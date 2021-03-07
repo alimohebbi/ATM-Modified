@@ -505,7 +505,7 @@ public class EventMatching {
         return null;
     }
 
-    // important
+    //  Compare text to text, id to id, cross then weighted max
     private double findMatchedEvents(Event event, String stateNodeTargetElementText, String stateNodeTargetElementId) {
         String eventTargetElementText = findTargetElementText(event.getTargetElement());
 
@@ -888,6 +888,7 @@ public class EventMatching {
         return nextEvent;
     }
 
+    // find the best fillable widget based on resource-id and text base on cross over eval. If score is below 0.2 then it considers edit distance. then score should above 0.4 as well
     private void pickBestPossibleInput(UiNode root, Event stateNode, UiNode stateNodeTargetElement, String inputType, Transition transition) throws IOException {
         double max_Score = 0;
         String stateNodeLabel = "", stateNodeText = "";

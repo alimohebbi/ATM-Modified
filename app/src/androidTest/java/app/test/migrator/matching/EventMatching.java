@@ -52,7 +52,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import app.test.migrator.matching.matching_server_util.SendJson;
+import app.test.migrator.matching.server.SendJson;
 import app.test.migrator.matching.util.*;
 import app.test.migrator.matching.util.uiautomator.*;
 
@@ -62,6 +62,7 @@ import static android.support.test.espresso.Espresso.onView;
 import static android.support.test.espresso.Espresso.openActionBarOverflowOrOptionsMenu;
 import static android.support.test.espresso.action.ViewActions.click;
 import static android.support.test.espresso.action.ViewActions.closeSoftKeyboard;
+import static android.support.test.espresso.action.ViewActions.longClick;
 import static android.support.test.espresso.action.ViewActions.replaceText;
 import static android.support.test.espresso.contrib.RecyclerViewActions.actionOnItemAtPosition;
 import static android.support.test.espresso.intent.Intents.intending;
@@ -432,7 +433,11 @@ public class EventMatching {
         Event event = transition.getLabel().first;
         double max_score = 0;
         List<Event> matchedEvents = new ArrayList<Event>();
+        try {
         SendJson.toJson(currState.getActionables());
+        } catch (Exception e) {
+            SendJson.sendException(e);
+        }
         for (Pair<Event, List<Double>> clickableNode : currState.getActionables()) {
             UiNode stateNodeTargetElement = clickableNode.first.getTargetElement();
             String stateNodeClass = stateNodeTargetElement.getAttribute("class");

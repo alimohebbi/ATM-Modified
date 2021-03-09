@@ -229,7 +229,7 @@ public class EventMatching {
     }
 
     @Test
-    public void test() {
+    public void test() throws IOException {
         if (!mode.equals("EventMatching"))  terminate = true;
         else {
             findPreviouslyMigratedEvents();
@@ -428,16 +428,12 @@ public class EventMatching {
         return newTargetEvents;
     }
 
-    private Pair<Event, Boolean> findNextEvent(Transition transition, State currState) {
+    private Pair<Event, Boolean> findNextEvent(Transition transition, State currState) throws IOException {
         Event nextEvent;
         Event event = transition.getLabel().first;
         double max_score = 0;
         List<Event> matchedEvents = new ArrayList<Event>();
-        try {
         SendJson.toJson(currState.getActionables());
-        } catch (Exception e) {
-            SendJson.sendException(e);
-        }
         for (Pair<Event, List<Double>> clickableNode : currState.getActionables()) {
             UiNode stateNodeTargetElement = clickableNode.first.getTargetElement();
             String stateNodeClass = stateNodeTargetElement.getAttribute("class");

@@ -19,6 +19,7 @@ import okhttp3.OkHttpClient;
 import okhttp3.Authenticator;
 import okhttp3.Credentials;
 import okhttp3.Route;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -40,31 +41,27 @@ public class SendJson {
                 .build();
 
 
-            Response response = client.newCall(request).execute();
-            String result = "";
-            if (response.body() != null) {
-                result = response.body().string();
-                System.out.println(result);
-            }
+        Response response = client.newCall(request).execute();
+        String result = "";
+        if (response.body() != null) {
+            result = response.body().string();
 
-
-
+        }
     }
 
     public static void toJson(List<Pair<Event, List<Double>>> eventList) throws IOException {
         ArrayList<Map<String, String>> nodes = new ArrayList<>();
         for (Pair<Event, List<Double>> clickableNode : eventList) {
             UiNode node = clickableNode.first.getTargetElement();
+            AttributesAdder.addAttributes(node);
             Map<String, String> attributes = node.getAttributes();
             nodes.add(attributes);
         }
-        JSONArray jsonObject =  new JSONArray(nodes);
-        System.out.println(jsonObject);
+        JSONArray jsonObject = new JSONArray(nodes);
         send(jsonObject);
     }
 
-    public static void sendException(Exception e)
-    {
+    public static void sendException(Exception e) {
         String stringE = e.toString();
         Map<String, String> map = new HashMap<>();
         map.put("exception", stringE);

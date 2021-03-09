@@ -52,7 +52,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import app.test.migrator.matching.server.SendJson;
+import app.test.migrator.matching.server.SendObject;
+import app.test.migrator.matching.server.ServerSemanticMatching;
 import app.test.migrator.matching.util.*;
 import app.test.migrator.matching.util.uiautomator.*;
 
@@ -433,7 +434,7 @@ public class EventMatching {
         Event event = transition.getLabel().first;
         double max_score = 0;
         List<Event> matchedEvents = new ArrayList<Event>();
-        SendJson.toJson(currState.getActionables());
+        ServerSemanticMatching.rankEvents(currState.getActionables());
         for (Pair<Event, List<Double>> clickableNode : currState.getActionables()) {
             UiNode stateNodeTargetElement = clickableNode.first.getTargetElement();
             String stateNodeClass = stateNodeTargetElement.getAttribute("class");

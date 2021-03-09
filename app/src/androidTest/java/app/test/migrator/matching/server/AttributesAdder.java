@@ -1,12 +1,12 @@
 package app.test.migrator.matching.server;
 
 import org.json.JSONObject;
+import app.test.migrator.matching.util.uiautomator.BasicTreeNode;
+import app.test.migrator.matching.util.uiautomator.UiNode;
 
 import java.io.IOException;
 import java.util.List;
 
-import app.test.migrator.matching.util.uiautomator.BasicTreeNode;
-import app.test.migrator.matching.util.uiautomator.UiNode;
 
 class AttributesAdder {
 

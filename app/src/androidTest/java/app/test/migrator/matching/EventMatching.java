@@ -52,8 +52,9 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import app.test.migrator.matching.server.SendObject;
-import app.test.migrator.matching.server.ServerSemanticMatching;
+import app.test.migrator.matching.server.ScoredObject;
+import app.test.migrator.matching.server.ServerSemanticMatchingNodes;
+import app.test.migrator.matching.server.ServerSemanticMatchingPairs;
 import app.test.migrator.matching.util.*;
 import app.test.migrator.matching.util.uiautomator.*;
 
@@ -93,7 +94,7 @@ public class EventMatching {
     private String scenarioName = determineScenarioName(b);
     private String mode = determineMode(b);
     private final String LOG_TAG = InstrumentationRegistry.getTargetContext().getPackageName();
-    private boolean navigationDrawerIsOpen = false ;
+    private boolean navigationDrawerIsOpen = false;
     private FiniteStateMachine scenario = new FiniteStateMachine();
     private List<UiNode> nodes = new ArrayList<UiNode>();
     private Map<String, Double> dictionary = new HashMap<String, Double>();
@@ -134,7 +135,7 @@ public class EventMatching {
             for (String line; (line = br.readLine()) != null; ) {
                 String[] lineSplittedBySpace = line.split(" ");
                 if (lineSplittedBySpace.length > 1) {
-                    if (isImageDict)    id_image.put(lineSplittedBySpace[0], lineSplittedBySpace[1]);
+                    if (isImageDict) id_image.put(lineSplittedBySpace[0], lineSplittedBySpace[1]);
                     else id_inputType.put(lineSplittedBySpace[0], lineSplittedBySpace[1]);
                 }
             }
@@ -217,9 +218,10 @@ public class EventMatching {
             int beginningIndex = indexToRemove.first - deduction;
             int endIndex = indexToRemove.second - deduction;
 
-            while(targetEvents.get(beginningIndex).first.contains("replaceText"))  beginningIndex++;
+            while (targetEvents.get(beginningIndex).first.contains("replaceText")) beginningIndex++;
 
-            if (targetEvents.get(beginningIndex).first.equals(targetEvents.get(endIndex).first))  continue;
+            if (targetEvents.get(beginningIndex).first.equals(targetEvents.get(endIndex).first))
+                continue;
 
             if (endIndex - beginningIndex > 0) {
                 targetEvents.subList(beginningIndex, endIndex).clear();
@@ -231,7 +233,7 @@ public class EventMatching {
 
     @Test
     public void test() throws IOException {
-        if (!mode.equals("EventMatching"))  terminate = true;
+        if (!mode.equals("EventMatching")) terminate = true;
         else {
             findPreviouslyMigratedEvents();
 
@@ -377,7 +379,7 @@ public class EventMatching {
                 for (String line; (line = br.readLine()) != null; ) {
                     if (line.contains("nextEvent:")) {
                         index = Integer.parseInt(line.substring(line.indexOf("index=\"") + 7, line.indexOf("\"", line.indexOf("index=\"") + 7)));
-                    } else if(!line.trim().equals("")) updatedFileContent.add(line);
+                    } else if (!line.trim().equals("")) updatedFileContent.add(line);
                 }
             }
 
@@ -429,82 +431,78 @@ public class EventMatching {
         return newTargetEvents;
     }
 
+    private List<UiNode> getStaticNodes(State currState) {
+        List<UiNode> uiNodeList = new ArrayList<>();
+        for (Triple<JsonNode, JsonRel, JsonNode> staticNodeRel : createStaticNodesAndRels()) {
+            Boolean alreadyVisited = false;
+            for (Pair<Event, List<Double>> sNode : currState.getActionables()) {
+                alreadyVisited = checkIfStaticNodeIsEqualToCurrentNode(staticNodeRel, sNode);
+                if (alreadyVisited) break;
+            }
+            if (alreadyVisited) continue;
+
+            String stateNodeTargetElementText = staticNodeRel.second.getText();
+            String stateNodeTargetElementId = staticNodeRel.second.getId();
+            UiNode node = new UiNode();
+            node.addAtrribute("text", stateNodeTargetElementText);
+            node.addAtrribute("resource-id", stateNodeTargetElementId);
+            uiNodeList.add(node);
+        }
+        return uiNodeList;
+    }
+
+    private Boolean checkIfStaticNodeIsEqualToCurrentNode(Triple<JsonNode, JsonRel,
+            JsonNode> staticNodeRel, Pair<Event, List<Double>> sNode) {
+        boolean alreadyVisited = false;
+        UiNode sNodeTargetElement = sNode.first.getTargetElement();
+        String resource_id = "", textOrDesc = "";
+        if (sNodeTargetElement.getAttribute("resource-id") != null && sNodeTargetElement.
+                getAttribute("resource-id").contains("/"))
+            resource_id = sNodeTargetElement.getAttribute("resource-id").split("/")[1];
+        if (sNodeTargetElement.getAttribute("text") != null)
+            textOrDesc = sNodeTargetElement.getAttribute("text");
+        if (textOrDesc.equals("") && sNodeTargetElement.getAttribute("content-desc") != null)
+            textOrDesc = sNodeTargetElement.getAttribute("content-desc");
+        if (resource_id.equals(staticNodeRel.second.getId()) &&
+                textOrDesc.equals(staticNodeRel.second.getText()))
+            alreadyVisited = true;
+        return alreadyVisited;
+    }
+
+    private List<ScoredObject<Event>> getDynamicCandidates(State currState,  Event event) throws IOException {
+        List<Pair<Event, List<Double>>> dynamicPairList = currState.getActionables();
+        return new ServerSemanticMatchingPairs(dynamicPairList,
+                event).getScoredObjects();
+    }
+
+    private List<ScoredObject<UiNode>> getStaticCandidates(State currState,  Event event) throws IOException {
+        List<UiNode> staticNodes = getStaticNodes(currState);
+        return new ServerSemanticMatchingNodes(staticNodes,
+                event).getScoredObjects();
+    }
+
     private Pair<Event, Boolean> findNextEvent(Transition transition, State currState) throws IOException {
         Event nextEvent;
         Event event = transition.getLabel().first;
-        double max_score = 0;
         List<Event> matchedEvents = new ArrayList<Event>();
-        ServerSemanticMatching.rankEvents(currState.getActionables());
-        for (Pair<Event, List<Double>> clickableNode : currState.getActionables()) {
-            UiNode stateNodeTargetElement = clickableNode.first.getTargetElement();
-            String stateNodeClass = stateNodeTargetElement.getAttribute("class");
+        List<ScoredObject<Event>> scoredEvents = getDynamicCandidates(currState, event);
+        List<ScoredObject<UiNode>> scoredStaticNodes = getStaticCandidates(currState, event);
 
-            if (stateNodeClass.contains("EditText")) continue;
+        double besDynamicScore=scoredEvents.get(0).getScore();
+        double bestStaticScore=scoredStaticNodes.get(0).getScore();
 
-            String stateNodeTargetElementText = findTargetElementText(stateNodeTargetElement);
-            String stateNodeTargetElementId = findStateNodeTargetElementId(stateNodeTargetElement);
-            double matchingScore = findMatchedEvents(event, stateNodeTargetElementText, stateNodeTargetElementId);
-            if (matchingScore >= 0.4 && matchingScore >= max_score) {
-                if (matchingScore > max_score) {
-                    matchedEvents.clear();
-                    matchedEvents.add(clickableNode.first);
-                } else {
-                    matchedEvents.add(clickableNode.first);
-                }
-                max_score = matchingScore;
-            }
-        }
-
-        double static_max_score = 0;
-        List<Triple<JsonNode, JsonRel, JsonNode>> staticMatchedEvents = new ArrayList<Triple<JsonNode, JsonRel, JsonNode>>();
-        if (matchedEvents.size() < 1) {
-            for (Triple<JsonNode, JsonRel, JsonNode> staticNodeRel : createStaticNodesAndRels()) {
-                Boolean alreadyVisited = false;
-                for (Pair<Event, List<Double>> sNode : currState.getActionables()) {
-                    UiNode sNodeTargetElement = sNode.first.getTargetElement();
-                    String resource_id = "", textOrDesc = "";
-                    if (sNodeTargetElement.getAttribute("resource-id") != null && sNodeTargetElement.getAttribute("resource-id").contains("/"))
-                        resource_id = sNodeTargetElement.getAttribute("resource-id").split("/")[1];
-                    if (sNodeTargetElement.getAttribute("text") != null)
-                        textOrDesc = sNodeTargetElement.getAttribute("text");
-                    if (textOrDesc.equals("") && sNodeTargetElement.getAttribute("content-desc") != null)
-                        textOrDesc = sNodeTargetElement.getAttribute("content-desc");
-                    if(resource_id.equals(staticNodeRel.second.getId()) &&
-                            textOrDesc.equals(staticNodeRel.second.getText()))
-                        alreadyVisited = true;
-                }
-
-                if (alreadyVisited) continue;
-
-                String stateNodeTargetElementText = staticNodeRel.second.getText();
-                String stateNodeTargetElementId = staticNodeRel.second.getId();
-                double matchingScore = findMatchedEvents(event, stateNodeTargetElementText, stateNodeTargetElementId);
-                if (matchingScore >= 0.4 && matchingScore >= static_max_score) {
-                    if (matchingScore > static_max_score) {
-                        staticMatchedEvents.clear();
-                        staticMatchedEvents.add(staticNodeRel);
-                    } else {
-                        staticMatchedEvents.add(staticNodeRel);
-                    }
-                    static_max_score = matchingScore;
-                }
-            }
-
-            if (staticMatchedEvents.size() > 0) {
-                for (Triple<JsonNode, JsonRel, JsonNode> staticMatchedEvent : staticMatchedEvents) {
-                    nextEvent = findStaticNextEvent(currState, staticMatchedEvent);
-                    if (nextEvent != null) {
-                        return new Pair<Event, Boolean>(nextEvent, false);
-                    }
-                }
-            }
-        } else {
-            matchedEvents_map.put(transition, matchedEvents);
-            nextEvent = matchedEvents.get(0);
-            matchedEvents.remove(0);
+        if(besDynamicScore > bestStaticScore) {
+            if (scoredEvents.size()>=2)
+                matchedEvents.add(scoredEvents.get(1).getObject());
+            nextEvent = scoredEvents.get(0).getObject();
             return new Pair<Event, Boolean>(nextEvent, true);
+        } else {
+            String id = scoredStaticNodes.get(0).getObject().getAttribute("resource-id");
+            nextEvent = findStaticNextEvent(currState, id);
+            if (nextEvent != null) {
+                return new Pair<Event, Boolean>(nextEvent, false);
+            }
         }
-
         return null;
     }
 
@@ -554,7 +552,7 @@ public class EventMatching {
 
     private String findStateNodeTargetElementId(UiNode stateNodeTargetElement) {
         String stateNodeTargetElementId = "";
-        UiNode listViewParentNode = (UiNode)stateNodeTargetElement.getParent();
+        UiNode listViewParentNode = (UiNode) stateNodeTargetElement.getParent();
         while (listViewParentNode != null && (!listViewParentNode.getAttribute("class").equals("android.widget.ListView") &&
                 !listViewParentNode.getAttribute("class").equals("android.support.v7.widget.RecyclerView") &&
                 !listViewParentNode.getAttribute("class").equals("android.widget.ExpandableListView"))) {
@@ -570,7 +568,7 @@ public class EventMatching {
 
     private void addStateAndTransitionToFSM(FiniteStateMachine fsm, State currState, State prevState, Event event) {
         if (prevState != null) {
-            if(fsm.getState(prevState) == null) fsm.addState(prevState);
+            if (fsm.getState(prevState) == null) fsm.addState(prevState);
             if (fsm.getState(currState) == null) fsm.addState(currState);
             fsm.addTransition(prevState, currState, new Triple<Event, Boolean, Double>(event, true, 0.0));
         } else {
@@ -610,7 +608,8 @@ public class EventMatching {
                                     rowObject.getString("type"));
                         }
                     }
-                    if (from != null && to != null && rel != null) jsonNodesRels.add(new Triple<JsonNode, JsonRel, JsonNode>(from, rel, to));
+                    if (from != null && to != null && rel != null)
+                        jsonNodesRels.add(new Triple<JsonNode, JsonRel, JsonNode>(from, rel, to));
                 }
             }
         } catch (JSONException | IOException e) {
@@ -628,7 +627,8 @@ public class EventMatching {
                 try {
                     StringBuilder previousScenarioName = new StringBuilder();
                     for (int i = 0; i < scenarioNameSplitted.length - 1; i++) {
-                        if (i != scenarioNameSplitted.length - 2)   previousScenarioName.append(scenarioNameSplitted[i]).append(" ");
+                        if (i != scenarioNameSplitted.length - 2)
+                            previousScenarioName.append(scenarioNameSplitted[i]).append(" ");
                         else previousScenarioName.append(scenarioNameSplitted[i]).append("_");
                     }
                     scenarioNamePostfix--;
@@ -637,7 +637,7 @@ public class EventMatching {
                     if (previousScenarioInputStream != null) {
                         BufferedReader br = new BufferedReader(new InputStreamReader(previousScenarioInputStream, "UTF8"));
                         Boolean skip = true;
-                        for (String line; (line = br.readLine()) != null;) {
+                        for (String line; (line = br.readLine()) != null; ) {
                             if (line.contains("@Test")) skip = false;
                             if (line.contains("@Before")) skip = true;
                             if (!skip) {
@@ -737,7 +737,8 @@ public class EventMatching {
 
             if (stateNodeClass.contains("EditText") && stateNode.second.size() == 0) {
                 String resource_id = stateNodeTargetElement.getAttribute("resource-id");
-                if (resource_id != null && resource_id.contains("/"))   resource_id = resource_id.split("/")[1];
+                if (resource_id != null && resource_id.contains("/"))
+                    resource_id = resource_id.split("/")[1];
 
                 String replacement_text_before = stateNodeTargetElement.getAttribute("replacementtext");
 
@@ -748,7 +749,8 @@ public class EventMatching {
                 }
 
                 String replacement_text_after = stateNodeTargetElement.getAttribute("replacementtext");
-                if(replacement_text_after != null && replacement_text_after.equals(replacement_text_before))    continue;
+                if (replacement_text_after != null && replacement_text_after.equals(replacement_text_before))
+                    continue;
                 if (replacement_text_after != null) {
                     currState.setClickableVisited(stateNode.first, 0);
 
@@ -757,7 +759,8 @@ public class EventMatching {
 
                     String targetEvent = "";
                     int id = 0;
-                    if (resource_id != null)    id = InstrumentationRegistry.getTargetContext().getResources().getIdentifier(resource_id, "id", InstrumentationRegistry.getTargetContext().getPackageName());
+                    if (resource_id != null)
+                        id = InstrumentationRegistry.getTargetContext().getResources().getIdentifier(resource_id, "id", InstrumentationRegistry.getTargetContext().getPackageName());
 
                     String text = null;
                     if (!stateNodeTargetElement.getAttribute("class").equals("android.widget.ImageButton") && stateNodeTargetElement.getAttribute("text") != null && !stateNodeTargetElement.getAttribute("text").equals("")) {
@@ -838,7 +841,8 @@ public class EventMatching {
             int max_longestCommonSubsequence = 0;
 
             for (Pair<Event, List<Double>> cl : currState.getActionables()) {
-                if (cl.first.getTargetElement().getAttribute("class").contains("EditText")) continue;
+                if (cl.first.getTargetElement().getAttribute("class").contains("EditText"))
+                    continue;
 
                 List<Double> indexes = cl.second;
 
@@ -870,7 +874,8 @@ public class EventMatching {
 
         if (nextEvent == null) {
             for (Pair<Event, List<Double>> cl : currState.getActionables()) {
-                if (cl.first.getTargetElement().getAttribute("class").contains("EditText")) continue;
+                if (cl.first.getTargetElement().getAttribute("class").contains("EditText"))
+                    continue;
 
                 List<Double> indexes = cl.second;
                 if (indexes.size() == 0) {
@@ -903,8 +908,10 @@ public class EventMatching {
             stateNodeText = stateNodeTargetElement.getAttribute("text");
         }
 
-        if (stateNodeText.equals(""))   stateNodeLabel = getEditTextLabel(root, xpath.toString(), stateNodeTargetElement, false);
-        else    stateNodeLabel = getEditTextLabel(root, xpath.toString(), stateNodeTargetElement, true);
+        if (stateNodeText.equals(""))
+            stateNodeLabel = getEditTextLabel(root, xpath.toString(), stateNodeTargetElement, false);
+        else
+            stateNodeLabel = getEditTextLabel(root, xpath.toString(), stateNodeTargetElement, true);
 
         if (stateNodeLabel.equals("") && stateNodeTargetElement.getAttribute("resource-id") != null && stateNodeTargetElement.getAttribute("resource-id").contains("/"))
             stateNodeLabel = stateNodeTargetElement.getAttribute("resource-id").split("/")[1];
@@ -969,8 +976,9 @@ public class EventMatching {
 
                 if ((score > max_Score || (score == max_Score && !transition.getLabel().second)) && score >= SIMILARITY_THRESHOLD) {
                     boolean add = true;
-                    if(inputType != null && (((inputType.contains("number") || inputType.contains("phone")) && (!event.getReplacementText().equals("") && !event.getReplacementText().matches("\\d+(?:\\.\\d+)?"))) ||
-                            ((!inputType.contains("number") && !inputType.contains("phone")) && event.getReplacementText().matches("\\d+(?:\\.\\d+)?"))))    add = false;
+                    if (inputType != null && (((inputType.contains("number") || inputType.contains("phone")) && (!event.getReplacementText().equals("") && !event.getReplacementText().matches("\\d+(?:\\.\\d+)?"))) ||
+                            ((!inputType.contains("number") && !inputType.contains("phone")) && event.getReplacementText().matches("\\d+(?:\\.\\d+)?"))))
+                        add = false;
                     if (add) {
                         best_replacement_text = event.getReplacementText();
                     }
@@ -1075,9 +1083,9 @@ public class EventMatching {
         final Activity[] currentActivity = new Activity[1];
         getInstrumentation().runOnMainSync(new Runnable() {
             public void run() {
-                Collection resumedActivities = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(RESUMED);
+                Collection<Activity> resumedActivities = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(RESUMED);
                 if (resumedActivities.iterator().hasNext()) {
-                    currentActivity[0] = (Activity) resumedActivities.iterator().next();
+                    currentActivity[0] = resumedActivities.iterator().next();
                 }
             }
         });
@@ -1089,8 +1097,7 @@ public class EventMatching {
         Activity activityInstance = getActivityInstance();
         if (activityInstance != null) {
             return activityInstance.getLocalClassName();
-        }
-        else return "";
+        } else return "";
     }
 
     private void prepareAction(Event nextEvent, Transition transition, String random, List<Triple<String, State, Event>> targetEvents_temp, FiniteStateMachine fsm) throws IOException {
@@ -1184,7 +1191,8 @@ public class EventMatching {
         try {
             if (type.contains("VIEW_CLICKED")) {
                 String contentDesc = null;
-                if (nextActionTargetElement != null)   contentDesc = nextActionTargetElement.getAttribute("content-desc");
+                if (nextActionTargetElement != null)
+                    contentDesc = nextActionTargetElement.getAttribute("content-desc");
                 if (contentDesc != null && contentDesc.equals("More options")) {
                     openActionBarOverflowOrOptionsMenu(InstrumentationRegistry.getTargetContext());
                     targetEvent = "\nopenActionBarOverflowOrOptionsMenu(getInstrumentation().getTargetContext());";
@@ -1293,12 +1301,14 @@ public class EventMatching {
                                     if (dumpWindowHierarchyBefore != null && dumpWindowHierarchyAfter != null && dumpWindowHierarchyBefore.equals(dumpWindowHierarchyAfter)) {
                                         Espresso.pressBack();
                                         targetEvent = "\npressBack();";
-                                    } else targetEvent = "\nonView(withContentDescription(\"" + contentDesc + "\")).perform(click());";
+                                    } else
+                                        targetEvent = "\nonView(withContentDescription(\"" + contentDesc + "\")).perform(click());";
                                     navigationDrawerIsOpen = false;
                                 } else {
                                     onView(withContentDescription(contentDesc)).perform(click());
                                     targetEvent = "\nonView(withContentDescription(\"" + contentDesc + "\")).perform(click());";
-                                    if (contentDesc.equals("Open navigation drawer"))   navigationDrawerIsOpen = true;
+                                    if (contentDesc.equals("Open navigation drawer"))
+                                        navigationDrawerIsOpen = true;
                                 }
                             } else {
                                 if (text != null) {
@@ -1415,7 +1425,8 @@ public class EventMatching {
     }
 
     private void recordEvent(String random, String targetEvent, Event nextEvent, List<Triple<String, State, Event>> targetEvents_temp, FiniteStateMachine fsm) {
-        if(targetEvent != null && !targetEvent.equals("")) targetEvents_temp.add(new Triple<String, State, Event>(targetEvent + random, getCurrentState(fsm), nextEvent));
+        if (targetEvent != null && !targetEvent.equals(""))
+            targetEvents_temp.add(new Triple<String, State, Event>(targetEvent + random, getCurrentState(fsm), nextEvent));
     }
 
     private void findXPath(StringBuilder xpath, UiNode node) {
@@ -1445,9 +1456,9 @@ public class EventMatching {
     }
 
     // What is the next step in the current window to reach the matched static event which is in some other window
-    private Event findStaticNextEvent(State state, Triple<JsonNode, JsonRel, JsonNode> static_event) {
+    private Event findStaticNextEvent(State state, String targetId) {
         Event stateNode = null;
-        String targetId = static_event.first.getId();
+
 
         List<String> sourceIds = new ArrayList<String>();
         try {
@@ -1524,7 +1535,8 @@ public class EventMatching {
                                     }
 
                                     String nodeTargetElementText = nodeTargetElement.getAttribute("text");
-                                    if (nodeTargetElementText == null || nodeTargetElementText.equals(""))  nodeTargetElementText = nodeTargetElement.getAttribute("content-desc");
+                                    if (nodeTargetElementText == null || nodeTargetElementText.equals(""))
+                                        nodeTargetElementText = nodeTargetElement.getAttribute("content-desc");
                                     if (((resource_id != null && resource_id.equals(id) || (listView_resource_id != null && listView_resource_id.equals(id))) &&
                                             (nodeTargetElementText == null || nodeTargetElementText.equals("") || text.equals("") || nodeTargetElementText.equals(text)))) {
                                         stateNode = new Event(transformStaticActionToEventType(action), nodeTargetElement, "", "0");
@@ -1550,12 +1562,12 @@ public class EventMatching {
                 .post(RequestBody.create(MediaType.parse("application/json; charset=utf-8"), "{\"statements\":[{\"statement\":" + json + "}]}"))
                 .build();
         Response response = client.newCall(request).execute();
-        if (response.body() != null)    return response.body().string();
+        if (response.body() != null) return response.body().string();
         else return "";
     }
 
     private static String filterWord(String str) {
-        if (str == null)    return "";
+        if (str == null) return "";
 
         str = str.toLowerCase();
 
@@ -1602,7 +1614,7 @@ public class EventMatching {
                 int splitIndex = str.indexOf(" ", startIndex);
                 if (str.indexOf("_", startIndex) > -1 && (splitIndex < 0 || str.indexOf("_", startIndex) < splitIndex))
                     splitIndex = str.indexOf("_", startIndex);
-                if (splitIndex > -1)    endIndex = splitIndex + 1;
+                if (splitIndex > -1) endIndex = splitIndex + 1;
                 str = str.replace(str.substring(startIndex, endIndex), "");
             }
         }
@@ -1663,10 +1675,10 @@ public class EventMatching {
             int numberOfMatchedTokens = 0;
             for (String currentStateText : currentStateLeafNodeLemmatizedText) {
                 currentStateText = filterWord(currentStateText);
-                if (currentStateText.equals(""))    continue;
+                if (currentStateText.equals("")) continue;
                 for (String scenarioStateText : scenarioStateLeafNodeLemmatizedText) {
                     scenarioStateText = filterWord(scenarioStateText);
-                    if (scenarioStateText.equals(""))    continue;
+                    if (scenarioStateText.equals("")) continue;
                     String key = currentStateText + scenarioStateText;
                     double score = 0;
                     if (currentStateText.equals(scenarioStateText)) {
@@ -1683,7 +1695,7 @@ public class EventMatching {
                         if (score < 0.4) {
                             double delta = stringDiff(filterWord(currentStateText), filterWord(scenarioStateText));
                             double sim = Math.max(filterWord(currentStateText).length(), filterWord(scenarioStateText).length()) - delta;
-                            if ((sim / (sim + delta)) >= 0.8)   score = sim / (sim + delta);
+                            if ((sim / (sim + delta)) >= 0.8) score = sim / (sim + delta);
                         }
                     }
 
@@ -1711,11 +1723,10 @@ public class EventMatching {
                 .build();
         Response response = client.newCall(request).execute();
         String result = "";
-        if (response.body() != null)    result = response.body().string();
+        if (response.body() != null) result = response.body().string();
         try {
             return Double.parseDouble(result);
-        }
-        catch(NumberFormatException e) {
+        } catch (NumberFormatException e) {
             return 0.0;
         }
     }
@@ -1757,10 +1768,10 @@ public class EventMatching {
         List<Entry<T, Double>> list = new LinkedList<>(map.entrySet());
 
         Collections.sort(list, new Comparator<Entry<T, Double>>() {
-                public int compare(Entry<T, Double> o1,
-                                   Entry<T, Double> o2) {
-                    return o2.getValue().compareTo(o1.getValue());
-                }
+            public int compare(Entry<T, Double> o1,
+                               Entry<T, Double> o2) {
+                return o2.getValue().compareTo(o1.getValue());
+            }
         });
 
         Map<T, Double> map_sorted = new LinkedHashMap<>();
@@ -1804,7 +1815,8 @@ public class EventMatching {
             leafNodes.add(new Pair<>(node, longClickable));
 
         for (BasicTreeNode leafNode : node.getChildren()) {
-            if (((UiNode)leafNode).getAttribute("long-clickable").equals("true")) longClickable = true;
+            if (((UiNode) leafNode).getAttribute("long-clickable").equals("true"))
+                longClickable = true;
 
             findLeafNodes((UiNode) leafNode, leafNodes, longClickable);
         }
@@ -1812,14 +1824,15 @@ public class EventMatching {
 
     private void findWebkitAncestors(UiNode node, List<UiNode> webkitNodes) {
         while (node != null) {
-            if (node.getAttribute("class") != null && node.getAttribute("class").equals("android.webkit.WebView")) webkitNodes.add(node);
+            if (node.getAttribute("class") != null && node.getAttribute("class").equals("android.webkit.WebView"))
+                webkitNodes.add(node);
 
             node = (UiNode) node.getParent();
         }
     }
 
     private List<Pair<Event, List<Double>>> findClickables(UiNode root, List<Pair<Event, List<Double>>> clickables, boolean navigateUp) {
-        if (root == null)   return new ArrayList<Pair<Event, List<Double>>>();
+        if (root == null) return new ArrayList<Pair<Event, List<Double>>>();
 
         BasicTreeNode[] nodes = root.getChildren();
         for (BasicTreeNode n : nodes) {
@@ -1832,10 +1845,12 @@ public class EventMatching {
             String checkable = node.getAttribute("checkable");
             String content_desc = node.getAttribute("content-desc");
 
-            if (id.contains("com.android.systemui") || id.contains("statusBarBackground") || id.contains("navigationBarBackground"))    continue;
+            if (id.contains("com.android.systemui") || id.contains("statusBarBackground") || id.contains("navigationBarBackground"))
+                continue;
 
             Event testRecorderEvent = null;
-            if (type.contains("EditText")) testRecorderEvent = new Event("VIEW_TEXT_CHANGED", node, "", "0");
+            if (type.contains("EditText"))
+                testRecorderEvent = new Event("VIEW_TEXT_CHANGED", node, "", "0");
             else if ((type.equals("android.support.v7.widget.RecyclerView") || type.equals("android.widget.ListView") || type.equals("android.widget.ExpandableListView")
                     || type.contains("RelativeLayout") || type.contains("LinearLayout") || type.contains("FrameLayout") || type.contains("Spinner")) && node.getChildCount() > 0) {
                 List<Pair<UiNode, Boolean>> leafNodes = new ArrayList<>();
@@ -1843,7 +1858,8 @@ public class EventMatching {
 
                 for (Pair<UiNode, Boolean> leaf : leafNodes) {
                     String leaf_type = leaf.first.getAttribute("class");
-                    if (leaf_type.contains("EditText")) testRecorderEvent = new Event("VIEW_TEXT_CHANGED", leaf.first, "", "0");
+                    if (leaf_type.contains("EditText"))
+                        testRecorderEvent = new Event("VIEW_TEXT_CHANGED", leaf.first, "", "0");
                     else if (type.equals("android.support.v7.widget.RecyclerView") || type.equals("android.widget.ListView")) {
                         if (!leaf.second) {
                             testRecorderEvent = new Event("LIST_ITEM_CLICKED", leaf.first, "", "0");
@@ -1917,7 +1933,7 @@ public class EventMatching {
         for (Pair<Event, List<Double>> c : clickables) {
             UiNode targetElement = c.first.getTargetElement();
             UiNode eventTargetElement = event.getTargetElement();
-            if (targetElement == null || eventTargetElement == null)  continue;
+            if (targetElement == null || eventTargetElement == null) continue;
             if (targetElement.toString().equals(eventTargetElement.toString())) return true;
         }
 
@@ -1936,7 +1952,7 @@ public class EventMatching {
     }
 
     private void findUINodesByID(UiNode node, String resourceId, int position) {
-        if (node == null)   return;
+        if (node == null) return;
 
         String resource_id = node.getAttribute("resource-id");
         if (resource_id != null && resource_id.contains("/")) {
@@ -1955,8 +1971,7 @@ public class EventMatching {
                     List<Pair<UiNode, Boolean>> leafs = new ArrayList<>();
                     findLeafNodes((UiNode) node.getChildrenList().get(position), leafs, false);
                     for (int i = 0; i < leafs.size(); i++) nodes.add(leafs.get(i).first);
-                }
-                else {
+                } else {
                     List<Pair<UiNode, Boolean>> leafs = new ArrayList<>();
                     findLeafNodes(node, leafs, false);
                     for (int i = 0; i < leafs.size(); i++) nodes.add(leafs.get(i).first);
@@ -2070,7 +2085,7 @@ public class EventMatching {
 
                         String action = line.substring(line.indexOf('[') + 1, line.indexOf("]["));
                         String targetElement = line.substring(line.indexOf('[', line.indexOf("][") + 1) + 1, line.indexOf(']', line.indexOf("][") + 1));
-                        if (!fileNameFrom.contains(targetElement))    fileNameFrom = targetElement;
+                        if (!fileNameFrom.contains(targetElement)) fileNameFrom = targetElement;
                         String[] targetElementSplittedBySpace = targetElement.split(" ");
                         String id = targetElementSplittedBySpace[0];
                         if (id.equals("0")) {
@@ -2078,7 +2093,8 @@ public class EventMatching {
                         }
 
                         if (action.contains("load adapter data") || action.contains("Handle transition")
-                                || action.contains("scroll to") || action.contains("input method editor")) continue;
+                                || action.contains("scroll to") || action.contains("input method editor"))
+                            continue;
 
                         int position = -1;
                         if (action.contains("position:")) {
@@ -2118,7 +2134,8 @@ public class EventMatching {
                                     postfix++;
                                     StringBuilder fileNameFromSB = new StringBuilder();
                                     for (int i = 0; i < fileNameFromSplitted.length - 1; i++) {
-                                        if (i != 0) fileNameFromSB.append(" ").append(fileNameFromSplitted[i]);
+                                        if (i != 0)
+                                            fileNameFromSB.append(" ").append(fileNameFromSplitted[i]);
                                         else fileNameFromSB.append(fileNameFromSplitted[i]);
                                     }
                                     fileNameFrom = fileNameFromSB.toString() + " " + postfix;
@@ -2145,7 +2162,7 @@ public class EventMatching {
                         scenario.addState(to);
                         updateCheckBoxText(rootFrom);
 
-                        if (nodes.size() > 0 && node == null ) node = nodes.get(0);
+                        if (nodes.size() > 0 && node == null) node = nodes.get(0);
 
                         if (node != null && !type.equals("PRESS_BACK")) {
                             String replacementText = determineLabelAndReplacementText(rootFrom, action, type, node, false);
@@ -2153,7 +2170,8 @@ public class EventMatching {
 
                             if (!type.equals("VIEW_CLICKED") || !node.getAttribute("class").contains("EditText")) {
                                 scenario.addTransition(from, to, new Triple<>(event, false, 0.0));
-                                if ((prevEvent == null || !prevEvent.getType().equals("VIEW_TEXT_CHANGED")) && !type.equals("VIEW_TEXT_CHANGED"))   determineImplicitInput(rootFrom, from, fromEditTexts, to, toEditTexts);
+                                if ((prevEvent == null || !prevEvent.getType().equals("VIEW_TEXT_CHANGED")) && !type.equals("VIEW_TEXT_CHANGED"))
+                                    determineImplicitInput(rootFrom, from, fromEditTexts, to, toEditTexts);
                             }
                             prevEvent = event;
                         } else {
@@ -2168,15 +2186,15 @@ public class EventMatching {
     }
 
     private void determineImplicitInput(UiNode rootFrom, State from, List<UiNode> fromEditTexts, State to, List<UiNode> toEditTexts) {
-        for (UiNode toEditText: toEditTexts) {
+        for (UiNode toEditText : toEditTexts) {
             String toId = toEditText.getAttribute("resource-id");
             String toText = toEditText.getAttribute("text");
             boolean alreadyExist = true;
-            for (UiNode fromEditText: fromEditTexts) {
+            for (UiNode fromEditText : fromEditTexts) {
                 String fromId = fromEditText.getAttribute("resource-id");
                 String fromText = fromEditText.getAttribute("text");
                 if (toId != null && fromId != null && toId.equals(fromId) && toText != null &&
-                        fromText != null && !toText.equals(fromText))    alreadyExist = false;
+                        fromText != null && !toText.equals(fromText)) alreadyExist = false;
             }
 
             if (!alreadyExist) {
@@ -2194,12 +2212,14 @@ public class EventMatching {
             findXPath(xpath, node);
 
             String label;
-            if (node.getAttribute("text") != null && !node.getAttribute("text").equals(""))   label = getEditTextLabel(rootFrom, xpath.toString(), node, true);
+            if (node.getAttribute("text") != null && !node.getAttribute("text").equals(""))
+                label = getEditTextLabel(rootFrom, xpath.toString(), node, true);
             else label = getEditTextLabel(rootFrom, xpath.toString(), node, false);
             node.addAtrribute("label", label);
 
-            if (!implicitInput)   replacementText = action.substring(action.indexOf("(") + 1, action.indexOf(")"));
-            else    replacementText = node.getAttribute("text");
+            if (!implicitInput)
+                replacementText = action.substring(action.indexOf("(") + 1, action.indexOf(")"));
+            else replacementText = node.getAttribute("text");
         }
         return replacementText;
     }
@@ -2215,7 +2235,8 @@ public class EventMatching {
             if (match != null && match.length() > 0) {
                 for (UiNode n : allNodes) {
                     String textOrDesc = n.getAttribute("text");
-                    if(textOrDesc == null || textOrDesc.equals(""))  textOrDesc = n.getAttribute("content-desc");
+                    if (textOrDesc == null || textOrDesc.equals(""))
+                        textOrDesc = n.getAttribute("content-desc");
                     if (textOrDesc != null && !textOrDesc.equals("") && textOrDesc.equalsIgnoreCase(match)) {
                         node = n;
                         text.append(" ").append(textOrDesc);
@@ -2224,7 +2245,7 @@ public class EventMatching {
             }
         }
 
-        if (node != null && text.length() > 0)  node.addAtrribute("text", text.toString());
+        if (node != null && text.length() > 0) node.addAtrribute("text", text.toString());
 
         if (node == null) {
             String clazz = getClassOfNode(fileNameFrom);
@@ -2234,7 +2255,8 @@ public class EventMatching {
                     String c = n.getAttribute("class");
                     if (c != null && c.toLowerCase().contains(clazz.toLowerCase())) {
                         String textOrDesc = n.getAttribute("text");
-                        if(textOrDesc == null || textOrDesc.equals(""))  textOrDesc = n.getAttribute("content-desc");
+                        if (textOrDesc == null || textOrDesc.equals(""))
+                            textOrDesc = n.getAttribute("content-desc");
                         text.append(" ").append(textOrDesc);
                         node = n;
                         count++;
@@ -2242,7 +2264,7 @@ public class EventMatching {
                 }
 
                 if (count != 1) node = null;
-                else if (text.length() > 0)  node.addAtrribute("text", text.toString());
+                else if (text.length() > 0) node.addAtrribute("text", text.toString());
             }
         }
 
@@ -2254,8 +2276,8 @@ public class EventMatching {
         String str = convertStreamToString(inputStream);
 
         int beginningIndex = -1;
-        if (str.indexOf("text=") > 0)   beginningIndex = str.indexOf(", text=") + 7;
-        else if (str.indexOf("desc=") > 0)  beginningIndex = str.indexOf(", desc=") + 7;
+        if (str.indexOf("text=") > 0) beginningIndex = str.indexOf(", text=") + 7;
+        else if (str.indexOf("desc=") > 0) beginningIndex = str.indexOf(", desc=") + 7;
 
         List<String> matches = new ArrayList<>();
         if (beginningIndex > 0) {
@@ -2376,20 +2398,22 @@ public class EventMatching {
                             int node_i_x1 = Integer.parseInt(node_i.getAttribute("x1"));
                             int node_i_x2 = Integer.parseInt(node_i.getAttribute("x2"));
 
-                            if (node_x1 < node_i_x1)    node_x1 = node_x2;
-                            else if (node_i_x1 < node_x1)   node_i_x1 = node_i_x2;
+                            if (node_x1 < node_i_x1) node_x1 = node_x2;
+                            else if (node_i_x1 < node_x1) node_i_x1 = node_i_x2;
 
                             double diff_y1 = Math.abs(node_y1 - node_i_y1);
                             double diff_x1 = Math.abs(node_x1 - node_i_x1);
                             if (textAlreadyExists) {
                                 if (diff_y1 >= 0 && diff_y1 < 150 && diff_x1 < 150) {
                                     label = node_i.getAttribute("text");
-                                    if (label == null || label.trim().equals(""))  label = node_i.getAttribute("content-desc");
+                                    if (label == null || label.trim().equals(""))
+                                        label = node_i.getAttribute("content-desc");
                                 }
                             } else {
                                 if (diff_y1 >= 0 && diff_y1 < 250 && diff_x1 < 250) {
                                     label = node_i.getAttribute("text");
-                                    if (label == null || label.trim().equals(""))  label = node_i.getAttribute("content-desc");
+                                    if (label == null || label.trim().equals(""))
+                                        label = node_i.getAttribute("content-desc");
                                 }
                             }
                         }

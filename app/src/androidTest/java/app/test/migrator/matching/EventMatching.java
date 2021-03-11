@@ -52,6 +52,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import app.test.migrator.matching.server.ObjectSender;
 import app.test.migrator.matching.server.ScoredObject;
 import app.test.migrator.matching.server.ServerSemanticMatchingNodes;
 import app.test.migrator.matching.server.ServerSemanticMatchingPairs;
@@ -469,7 +470,7 @@ public class EventMatching {
         return alreadyVisited;
     }
 
-    private List<ScoredObject<Event>> getDynamicCandidates(State currState,  Event event) throws IOException {
+    private List<ScoredObject<Pair<Event, List<Double>>>> getDynamicCandidates(State currState,  Event event) throws IOException {
         List<Pair<Event, List<Double>>> dynamicPairList = currState.getActionables();
         return new ServerSemanticMatchingPairs(dynamicPairList,
                 event).getScoredObjects();
@@ -485,7 +486,7 @@ public class EventMatching {
         Event nextEvent;
         Event event = transition.getLabel().first;
         List<Event> matchedEvents = new ArrayList<Event>();
-        List<ScoredObject<Event>> scoredEvents = getDynamicCandidates(currState, event);
+        List<ScoredObject<Pair<Event, List<Double>>>> scoredEvents = getDynamicCandidates(currState, event);
         List<ScoredObject<UiNode>> scoredStaticNodes = getStaticCandidates(currState, event);
 
         double besDynamicScore=scoredEvents.get(0).getScore();
@@ -493,11 +494,15 @@ public class EventMatching {
 
         if(besDynamicScore > bestStaticScore) {
             if (scoredEvents.size()>=2)
-                matchedEvents.add(scoredEvents.get(1).getObject());
-            nextEvent = scoredEvents.get(0).getObject();
+                matchedEvents.add(scoredEvents.get(1).getObject().first);
+            nextEvent = scoredEvents.get(0).getObject().first;
+            Map <String,String> signal = new HashMap<>();
+            signal.put("choice", "dynamic");
+            ObjectSender.sendObject(new JSONObject(signal),"exception");
             return new Pair<Event, Boolean>(nextEvent, true);
         } else {
             String id = scoredStaticNodes.get(0).getObject().getAttribute("resource-id");
+            ObjectSender.sendObject(new JSONObject(scoredStaticNodes.get(0).getObject().getAttributes()),"exception");
             nextEvent = findStaticNextEvent(currState, id);
             if (nextEvent != null) {
                 return new Pair<Event, Boolean>(nextEvent, false);
@@ -727,10 +732,15 @@ public class EventMatching {
         }
     }
 
-    private boolean performReplaceText(State currState, UiNode root, Transition transition, List<Triple<String, State, Event>> targetEvents_temp) {
+    private boolean performReplaceText(State currState, UiNode root, Transition transition,
+                                       List<Triple<String, State, Event>> targetEvents_temp)
+            throws IOException {
         boolean matched = false;
-        for (int index = 0; index < currState.getActionables().size(); index++) {
-            Pair<Event, List<Double>> stateNode = currState.getActionables().get(index);
+        Event event = transition.getLabel().first;
+        List<ScoredObject<Pair<Event, List<Double>>>> scoredEvents = getDynamicCandidates(currState, event);
+
+        for (int index = 0; index < scoredEvents.size(); index++) {
+            Pair<Event, List<Double>> stateNode = scoredEvents.get(index).getObject();
 
             UiNode stateNodeTargetElement = stateNode.first.getTargetElement();
             String stateNodeClass = stateNodeTargetElement.getAttribute("class");
@@ -742,11 +752,7 @@ public class EventMatching {
 
                 String replacement_text_before = stateNodeTargetElement.getAttribute("replacementtext");
 
-                try {
-                    pickBestPossibleInput(root, stateNode.first, stateNodeTargetElement, id_inputType.get(resource_id), transition);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+                pickBestPossibleInput(stateNode.first, transition);
 
                 String replacement_text_after = stateNodeTargetElement.getAttribute("replacementtext");
                 if (replacement_text_after != null && replacement_text_after.equals(replacement_text_before))
@@ -894,6 +900,17 @@ public class EventMatching {
             }
         }
         return nextEvent;
+    }
+
+    private void pickBestPossibleInput(Event targetEvent, Transition transition) {
+        String ac = targetEvent.getType();
+        UiNode targetNode = targetEvent.getTargetElement();
+        Event event = transition.getLabel().first;
+        if (ac.equals("VIEW_TEXT_CHANGED")) {
+            String best_replacement_text = event.getReplacementText();
+            targetNode.addAtrribute("replacementtext", best_replacement_text);
+            targetEvent.setReplacementText(best_replacement_text);
+        }
     }
 
     // find the best fillable widget based on resource-id and text base on cross over eval. If score is below 0.2 then it considers edit distance. then score should above 0.4 as well

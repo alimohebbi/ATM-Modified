@@ -9,3 +9,7 @@ local.properties
 build
 captures
 .externalNativeBuild
+gradle
+app/gradle
+app/build
+app/libs

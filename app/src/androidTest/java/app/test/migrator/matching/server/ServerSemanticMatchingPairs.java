@@ -10,8 +10,8 @@ import app.test.migrator.matching.util.Pair;
 import app.test.migrator.matching.util.uiautomator.UiNode;
 
 public class ServerSemanticMatchingPairs extends ServerSemanticMatchingABS<Pair<Event, List<Double>>, Pair<Event, List<Double>>> {
-    public ServerSemanticMatchingPairs(List<Pair<Event, List<Double>>> objectToScored, Event sourceEvent) {
-        super(objectToScored, sourceEvent);
+    public ServerSemanticMatchingPairs(List<Pair<Event, List<Double>>> objectToScored, UiNode sourceNode) {
+        super(objectToScored, sourceNode);
     }
 
     @Override

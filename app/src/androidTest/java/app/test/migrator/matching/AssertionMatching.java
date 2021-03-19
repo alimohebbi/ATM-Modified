@@ -50,6 +50,7 @@ import org.junit.runner.RunWith;
 
 import android.support.test.uiautomator.UiDevice;
 
+import app.test.migrator.matching.server.ScoredObject;
 import app.test.migrator.matching.util.*;
 import app.test.migrator.matching.util.uiautomator.*;
 
@@ -71,6 +72,7 @@ import static android.support.test.espresso.matcher.ViewMatchers.withId;
 import static android.support.test.espresso.matcher.ViewMatchers.withText;
 import static android.support.test.espresso.matcher.ViewMatchers.withXPath;
 import static android.support.test.runner.lifecycle.Stage.RESUMED;
+import static app.test.migrator.matching.CommonMatchingOps.getDynamicCandidates;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.anything;
 import static org.hamcrest.Matchers.not;
@@ -232,7 +234,7 @@ public class AssertionMatching {
     }
 
     @Test
-    public void test() {
+    public void test() throws IOException {
         if (!mode.equals("AssertionMatching"))  terminate = true;
         else {
             replayCorrespondingScenarioIfExists();
@@ -520,6 +522,8 @@ public class AssertionMatching {
                 }
             }
         }
+        throw new RuntimeException("First loop of pick best");
+
     }
 
     private UiNode getRoot() {
@@ -635,6 +639,7 @@ public class AssertionMatching {
         for (int index = 0; index < scenario.getTransitions().size(); index++) {
             Transition tr = scenario.getTransitions().get(index);
             Event event = tr.getLabel().first;
+
             if (event != null && event.getTargetElement() != null && event.getTargetElement().getAttribute("class") != null && event.getTargetElement().getAttribute("class").contains("EditText")) {
                 double SIMILARITY_THRESHOLD = 0.4;
 
@@ -729,6 +734,7 @@ public class AssertionMatching {
             stateNodeTargetElement.addAtrribute("replacementtext", best_replacement_text);
             stateNode.setReplacementText(best_replacement_text);
         }
+        throw new RuntimeException("First loop of pick best");
     }
 
     private State getCurrentState(FiniteStateMachine fsm) {
@@ -1185,6 +1191,7 @@ public class AssertionMatching {
                 e.printStackTrace();
                 Log.e("RuntimeException", e.getMessage());
             }
+            throw new RuntimeException("Press back");
         }
     }
 
@@ -1219,7 +1226,7 @@ public class AssertionMatching {
         findXPath(xpath, parent);
     }
 
-    private List<Pair<Assertion, Event>> findSimilarAssertions(State state) {
+    private List<Pair<Assertion, Event>> findSimilarAssertions(State state) throws IOException {
         List<Pair<Assertion, Event>> matchedAssertions = new ArrayList<Pair<Assertion, Event>>();
         for (Assertion assertion : assertions) {
             if (assertion.getVisited()) continue;
@@ -1233,45 +1240,24 @@ public class AssertionMatching {
         return matchedAssertions;
     }
 
-    private Event findMatchedActionable(State state, UiNode assertionTargetElement) {
+    private Event findMatchedActionable(State state, UiNode assertionTargetElement) throws IOException {
         double max_score = -1;
         Event matchedNode = null;
-        for (Pair<Event, List<Double>> InteractableNode : state.getActionables()) {
-            UiNode stateNodeTargetElement = InteractableNode.first.getTargetElement();
-            String eventTargetElementText = assertionTargetElement.getAttribute("text");
-            String eventTargetElementClass = assertionTargetElement.getAttribute("class");
+        List<ScoredObject<Pair<Event, List<Double>>>> scoredEvents = getDynamicCandidates(state, assertionTargetElement);
+        for (ScoredObject<Pair<Event, List<Double>>> interactableEvent : scoredEvents) {
+            UiNode stateNodeTargetElement = interactableEvent.getObject().first.getTargetElement();
 
-            if (eventTargetElementText == null || eventTargetElementText.equals(""))
-                eventTargetElementText = assertionTargetElement.getAttribute("content-desc");
-            if (assertionTargetElement.getAttribute("src") != null && !assertionTargetElement.getAttribute("src").equals("")
-                    && assertionTargetElement.getAttribute("resource-id") != null && assertionTargetElement.getAttribute("resource-id").contains("/"))
-                eventTargetElementText += " " + assertionTargetElement.getAttribute("resource-id").split("/")[1];
-
-            String stateNodeTargetElementText = stateNodeTargetElement.getAttribute("text");
+            String assertionTargetElementClass = assertionTargetElement.getAttribute("class");
             String stateNodeTargetElementClass = stateNodeTargetElement.getAttribute("class");
 
-            if ((eventTargetElementClass.contains("EditText") && !stateNodeTargetElementClass.contains("EditText")) ||
-                    (!eventTargetElementClass.contains("EditText") && stateNodeTargetElementClass.contains("EditText")) ||
-                    (!eventTargetElementClass.contains("CheckBox") && stateNodeTargetElementClass.contains("CheckBox")) ||
-                    (eventTargetElementClass.contains("CheckBox") && !stateNodeTargetElementClass.contains("CheckBox")))    continue;
+            if ((assertionTargetElementClass.contains("EditText") && !stateNodeTargetElementClass.contains("EditText")) ||
+                    (!assertionTargetElementClass.contains("EditText") && stateNodeTargetElementClass.contains("EditText")) ||
+                    (!assertionTargetElementClass.contains("CheckBox") && stateNodeTargetElementClass.contains("CheckBox")) ||
+                    (assertionTargetElementClass.contains("CheckBox") && !stateNodeTargetElementClass.contains("CheckBox")))
+                continue;
+            if (interactableEvent.getScore()>0)
+                matchedNode = interactableEvent.getObject().first;
 
-            if (stateNodeTargetElementText == null || stateNodeTargetElementText.equals(""))
-                stateNodeTargetElementText = stateNodeTargetElement.getAttribute("content-desc");
-            if (stateNodeTargetElement.getAttribute("src") != null && !stateNodeTargetElement.getAttribute("src").equals("")
-                    && stateNodeTargetElement.getAttribute("resource-id") != null && stateNodeTargetElement.getAttribute("resource-id").contains("/"))
-                stateNodeTargetElementText += " " + stateNodeTargetElement.getAttribute("resource-id").split("/")[1];
-
-            double textMatchingScore;
-            if (eventTargetElementText != null && stateNodeTargetElementText != null && !eventTargetElementText.equals("") && !stateNodeTargetElementText.equals("")) {
-                String currentStateLeafNodeText = stateNodeTargetElementText.toLowerCase();
-                String scenarioStateLeafNodeText = eventTargetElementText.toLowerCase();
-                textMatchingScore = compareTextWithLemmatization(currentStateLeafNodeText, scenarioStateLeafNodeText);
-
-                if (textMatchingScore >= 0.6 && textMatchingScore > max_score) {
-                    max_score = textMatchingScore;
-                    matchedNode = InteractableNode.first;
-                }
-            }
         }
         return matchedNode;
     }

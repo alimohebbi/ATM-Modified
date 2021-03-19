@@ -75,6 +75,7 @@ import static android.support.test.espresso.matcher.ViewMatchers.withId;
 import static android.support.test.espresso.matcher.ViewMatchers.withText;
 import static android.support.test.espresso.matcher.ViewMatchers.withXPath;
 import static android.support.test.runner.lifecycle.Stage.RESUMED;
+import static app.test.migrator.matching.CommonMatchingOps.getDynamicCandidates;
 import static org.hamcrest.CoreMatchers.anything;
 import static org.hamcrest.Matchers.allOf;
 
@@ -470,16 +471,10 @@ public class EventMatching {
         return alreadyVisited;
     }
 
-    private List<ScoredObject<Pair<Event, List<Double>>>> getDynamicCandidates(State currState,  Event event) throws IOException {
-        List<Pair<Event, List<Double>>> dynamicPairList = currState.getActionables();
-        return new ServerSemanticMatchingPairs(dynamicPairList,
-                event).getScoredObjects();
-    }
-
     private List<ScoredObject<UiNode>> getStaticCandidates(State currState,  Event event) throws IOException {
         List<UiNode> staticNodes = getStaticNodes(currState);
-        return new ServerSemanticMatchingNodes(staticNodes,
-                event).getScoredObjects();
+        UiNode node = event.getTargetElement();
+        return new ServerSemanticMatchingNodes(staticNodes, node).getScoredObjects();
     }
 
     private Pair<Event, Boolean> findNextEvent(Transition transition, State currState) throws IOException {

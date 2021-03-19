@@ -9,8 +9,8 @@ import app.test.migrator.matching.util.Event;
 import app.test.migrator.matching.util.uiautomator.UiNode;
 
 public class ServerSemanticMatchingNodes extends ServerSemanticMatchingABS<UiNode, UiNode> {
-    public ServerSemanticMatchingNodes(List<UiNode> objectToScored, Event sourceEvent) {
-        super(objectToScored, sourceEvent);
+    public ServerSemanticMatchingNodes(List<UiNode> objectToScored, UiNode sourceNode) {
+        super(objectToScored, sourceNode);
     }
 
     @Override

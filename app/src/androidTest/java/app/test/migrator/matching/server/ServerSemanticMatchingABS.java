@@ -16,9 +16,9 @@ public abstract class ServerSemanticMatchingABS<T, M> {
     List<T> objectToScored = null;
     Map<String, String> sourceEvent = null;
 
-    public ServerSemanticMatchingABS(List<T> objectsToScored, Event sourceEvent) {
+    public ServerSemanticMatchingABS(List<T> objectsToScored, UiNode sourceNode) {
         this.objectToScored = objectsToScored;
-        this.sourceEvent = sourceEvent.getTargetElement().getAttributes();
+        this.sourceEvent = sourceNode.getAttributes();
     }
 
     public List<ScoredObject<M>> getScoredObjects() throws IOException {

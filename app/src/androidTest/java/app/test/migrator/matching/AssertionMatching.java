@@ -72,6 +72,9 @@ import static android.support.test.espresso.matcher.ViewMatchers.withId;
 import static android.support.test.espresso.matcher.ViewMatchers.withText;
 import static android.support.test.espresso.matcher.ViewMatchers.withXPath;
 import static android.support.test.runner.lifecycle.Stage.RESUMED;
+import static app.test.migrator.matching.CommonMatchingOps.alreadyContainsClickable;
+import static app.test.migrator.matching.CommonMatchingOps.findLeafNodes;
+import static app.test.migrator.matching.CommonMatchingOps.findWebkitAncestors;
 import static app.test.migrator.matching.CommonMatchingOps.getDynamicCandidates;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.anything;
@@ -1508,24 +1511,7 @@ public class AssertionMatching {
         return a;
     }
 
-    private void findLeafNodes(UiNode node, List<Pair<UiNode, Boolean>> leafNodes, Boolean longClickable) {
-        if (node.getChildCount() == 0 && !node.getAttribute("class").equals("android.support.v7.widget.RecyclerView"))
-            leafNodes.add(new Pair<>(node, longClickable));
 
-        for (BasicTreeNode leafNode : node.getChildren()) {
-            if (((UiNode)leafNode).getAttribute("long-clickable").equals("true")) longClickable = true;
-
-            findLeafNodes((UiNode) leafNode, leafNodes, longClickable);
-        }
-    }
-
-    private void findWebkitAncestors(UiNode node, List<UiNode> webkitNodes) {
-        while (node != null) {
-            if (node.getAttribute("class") != null && node.getAttribute("class").equals("android.webkit.WebView")) webkitNodes.add(node);
-
-            node = (UiNode) node.getParent();
-        }
-    }
 
     private List<Pair<Event, List<Double>>> findInteractables(UiNode root, List<Pair<Event, List<Double>>> interactables, boolean navigateUp) {
         if (root == null)   return new ArrayList<Pair<Event, List<Double>>>();
@@ -1622,16 +1608,6 @@ public class AssertionMatching {
         return interactables;
     }
 
-    private boolean alreadyContainsClickable(Event event, List<Pair<Event, List<Double>>> clickables) {
-        for (Pair<Event, List<Double>> c : clickables) {
-            UiNode targetElement = c.first.getTargetElement();
-            UiNode eventTargetElement = event.getTargetElement();
-            if (targetElement == null || eventTargetElement == null)  continue;
-            if (targetElement.toString().equals(eventTargetElement.toString())) return true;
-        }
-
-        return false;
-    }
 
     private static String convertStreamToString(InputStream is) throws Exception {
         BufferedReader reader = new BufferedReader(new InputStreamReader(is));

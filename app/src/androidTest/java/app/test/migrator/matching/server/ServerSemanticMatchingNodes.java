@@ -5,17 +5,16 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-import app.test.migrator.matching.util.Event;
 import app.test.migrator.matching.util.uiautomator.UiNode;
 
 public class ServerSemanticMatchingNodes extends ServerSemanticMatchingABS<UiNode, UiNode> {
     public ServerSemanticMatchingNodes(List<UiNode> objectToScored, UiNode sourceNode) {
-        super(objectToScored, sourceNode);
+        super(objectToScored, null, sourceNode);
     }
 
     @Override
-    UiNode getNode(int i) throws IOException {
-        return this.objectToScored.get(i);
+    UiNode getNode(int i, List<UiNode> objects) throws IOException {
+        return objects.get(i);
     }
 
     @Override

@@ -55,7 +55,6 @@ import org.junit.runner.RunWith;
 import app.test.migrator.matching.server.ObjectSender;
 import app.test.migrator.matching.server.ScoredObject;
 import app.test.migrator.matching.server.ServerSemanticMatchingNodes;
-import app.test.migrator.matching.server.ServerSemanticMatchingPairs;
 import app.test.migrator.matching.util.*;
 import app.test.migrator.matching.util.uiautomator.*;
 

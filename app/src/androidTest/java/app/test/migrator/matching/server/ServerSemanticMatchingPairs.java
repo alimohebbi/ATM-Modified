@@ -9,16 +9,21 @@ import app.test.migrator.matching.util.Event;
 import app.test.migrator.matching.util.Pair;
 import app.test.migrator.matching.util.uiautomator.UiNode;
 
+import static app.test.migrator.matching.CommonMatchingOps.addAttributes;
+
 public class ServerSemanticMatchingPairs extends ServerSemanticMatchingABS<Pair<Event, List<Double>>, Pair<Event, List<Double>>> {
-    public ServerSemanticMatchingPairs(List<Pair<Event, List<Double>>> objectToScored, UiNode sourceNode) {
-        super(objectToScored, sourceNode);
+    public ServerSemanticMatchingPairs(
+            List<Pair<Event, List<Double>>> objectToScored,
+            List<Pair<Event, List<Double>>> labelNodes,
+            UiNode sourceNode) {
+        super(objectToScored,labelNodes, sourceNode);
     }
 
     @Override
-    UiNode getNode(int i) throws IOException {
-        Pair<Event, List<Double>> clickableNode = this.objectToScored.get(i);
+    UiNode getNode(int i, List<Pair<Event, List<Double>>> objects) throws IOException {
+        Pair<Event, List<Double>> clickableNode = objects.get(i);
         UiNode node = clickableNode.first.getTargetElement();
-        AttributesAdder.addAttributes(node);
+        addAttributes(node);
         return node;
     }
 

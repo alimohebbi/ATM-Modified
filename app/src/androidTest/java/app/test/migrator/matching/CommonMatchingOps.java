@@ -171,19 +171,31 @@ public class CommonMatchingOps {
         return typeEndsWithOneOf(type, labels);
     }
 
+    private static String getText(UiNode node) {
+        String text = node.getAttribute("text");
+        if (!text.equals(""))
+            return text;
+        return node.getAttribute("content-desc");
+    }
+
     public static void addAttributes(UiNode node) throws IOException {
         UiNode parent = (UiNode) node.getParent();
         String parentText = parent.getAttribute("text");
+        String nodeText = node.getAttribute("text");
         List<BasicTreeNode> childrenList = parent.getChildrenList();
         UiNode sibling = null;
         for (BasicTreeNode child : childrenList) {
             sibling = (UiNode) child;
-            if (!sibling.equals(node))
+            String siblingText = node.getAttribute("text");
+            if (!siblingText.equals(nodeText))
                 break;
+            sibling = null;
         }
-        String siblingText = sibling.getAttribute("text");
-        node.addAtrribute("parentText", parentText);
-        node.addAtrribute("siblingText", siblingText);
+        if (sibling != null) {
+            String siblingText = sibling.getAttribute("text");
+            node.addAtrribute("parentText", parentText);
+            node.addAtrribute("siblingText", siblingText);
+        }
     }
 
 

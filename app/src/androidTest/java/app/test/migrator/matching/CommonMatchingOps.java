@@ -37,9 +37,16 @@ public class CommonMatchingOps {
 
     static List<ScoredObject<Pair<Event, List<Double>>>> getDynamicCandidates(State currState, UiNode node) throws IOException {
         List<Pair<Event, List<Double>>> dynamicPairList = currState.getActionables();
+        addActivityNameToEvents(dynamicPairList, currState);
         UiNode root = getRoot(currState);
         List<Pair<Event, List<Double>>> labels = findLabels(root, new ArrayList<Pair<Event, List<Double>>>());
         return new ServerSemanticMatchingPairs(dynamicPairList, labels, node).getScoredObjects();
+    }
+
+    private static void addActivityNameToEvents(List<Pair<Event, List<Double>>> dynamicPairList, State currState) {
+        String activityName = currState.getFileName();
+        dynamicPairList.forEach(x ->
+                x.first.getTargetElement().addAtrribute("activity", activityName));
     }
 
     private static List<Pair<Event, List<Double>>> findLabels(UiNode root, List<Pair<Event, List<Double>>> eventPairs) {
@@ -178,7 +185,7 @@ public class CommonMatchingOps {
         return node.getAttribute("content-desc");
     }
 
-    public static void addAttributes(UiNode node) throws IOException {
+    public static void addFamilyAttributes(UiNode node) throws IOException {
         UiNode parent = (UiNode) node.getParent();
         String parentText = parent.getAttribute("text");
         String nodeText = node.getAttribute("text");
@@ -193,8 +200,8 @@ public class CommonMatchingOps {
         }
         if (sibling != null) {
             String siblingText = sibling.getAttribute("text");
-            node.addAtrribute("parentText", parentText);
-            node.addAtrribute("siblingText", siblingText);
+            node.addAtrribute("parent_text", parentText);
+            node.addAtrribute("sibling_text", siblingText);
         }
     }
 
@@ -202,6 +209,24 @@ public class CommonMatchingOps {
     private static UiNode getRoot(State currState) {
         UiHierarchyXmlLoader xmlLoader = new UiHierarchyXmlLoader();
         return (UiNode) xmlLoader.parseXml(currState.getGUIHierarchy());
+    }
+
+
+    public class MyTest {
+
+        private Activity getActivityInstance(){
+            final Activity[] currentActivity = {null};
+
+            getInstrumentation().runOnMainSync(new Runnable(){
+                public void run(){
+                    Collection<Activity> resumedActivity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED);
+                    Iterator<Activity> it = resumedActivity.iterator();
+                    currentActivity[0] = it.next();
+                }
+            });
+
+            return currentActivity[0];
+        }
     }
 
 }

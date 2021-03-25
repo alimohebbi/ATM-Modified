@@ -9,13 +9,13 @@ import app.test.migrator.matching.util.Event;
 import app.test.migrator.matching.util.Pair;
 import app.test.migrator.matching.util.uiautomator.UiNode;
 
-import static app.test.migrator.matching.CommonMatchingOps.addAttributes;
+import static app.test.migrator.matching.CommonMatchingOps.addFamilyAttributes;
 
 public class ServerSemanticMatchingPairs extends ServerSemanticMatchingABS<Pair<Event, List<Double>>, Pair<Event, List<Double>>> {
     public ServerSemanticMatchingPairs(
             List<Pair<Event, List<Double>>> objectToScored,
             List<Pair<Event, List<Double>>> labelNodes,
-            UiNode sourceNode) {
+            UiNode sourceNode) throws IOException {
         super(objectToScored,labelNodes, sourceNode);
     }
 
@@ -23,7 +23,7 @@ public class ServerSemanticMatchingPairs extends ServerSemanticMatchingABS<Pair<
     UiNode getNode(int i, List<Pair<Event, List<Double>>> objects) throws IOException {
         Pair<Event, List<Double>> clickableNode = objects.get(i);
         UiNode node = clickableNode.first.getTargetElement();
-        addAttributes(node);
+        addFamilyAttributes(node);
         return node;
     }
 

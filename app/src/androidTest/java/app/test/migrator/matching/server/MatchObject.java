@@ -3,23 +3,23 @@ import java.util.Map;
 
 public class MatchObject {
     private Map<Integer, Map<String, String>> candidates;
-    private Map<Integer, Map<String, String>> labels;
+    private Map<Integer, Map<String, String>> targetLabels;
     private Map<String, String> sourceEvent;
 
     public MatchObject(Map<Integer, Map<String, String>> candidates,
-                       Map<Integer, Map<String, String>> labels,
+                       Map<Integer, Map<String, String>> targetLabels,
                        Map<String, String> sourceEvent) {
         this.candidates = candidates;
-        this.labels = labels;
+        this.targetLabels = targetLabels;
         this.sourceEvent = sourceEvent;
     }
 
-    public Map<Integer, Map<String, String>> getLabels() {
-        return labels;
+    public Map<Integer, Map<String, String>> getTargetLabels() {
+        return targetLabels;
     }
 
-    public void setLabels(Map<Integer, Map<String, String>> labels) {
-        this.labels = labels;
+    public void setTargetLabels(Map<Integer, Map<String, String>> targetLabels) {
+        this.targetLabels = targetLabels;
     }
 
     public Map<Integer, Map<String, String>> getCandidates() {

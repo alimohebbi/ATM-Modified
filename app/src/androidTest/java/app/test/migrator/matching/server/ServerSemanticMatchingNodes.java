@@ -8,7 +8,7 @@ import java.util.Map;
 import app.test.migrator.matching.util.uiautomator.UiNode;
 
 public class ServerSemanticMatchingNodes extends ServerSemanticMatchingABS<UiNode, UiNode> {
-    public ServerSemanticMatchingNodes(List<UiNode> objectToScored, UiNode sourceNode) {
+    public ServerSemanticMatchingNodes(List<UiNode> objectToScored, UiNode sourceNode) throws IOException {
         super(objectToScored, null, sourceNode);
     }
 

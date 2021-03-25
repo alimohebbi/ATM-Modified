@@ -8,6 +8,7 @@ import java.util.*;
 
 import app.test.migrator.matching.util.uiautomator.UiNode;
 
+import static app.test.migrator.matching.CommonMatchingOps.addFamilyAttributes;
 import static app.test.migrator.matching.server.ObjectSender.sendDescriptors;
 
 public abstract class ServerSemanticMatchingABS<T, M> {
@@ -15,10 +16,11 @@ public abstract class ServerSemanticMatchingABS<T, M> {
     List<T> labelsNodes = null;
     Map<String, String> sourceEvent = null;
 
-    public ServerSemanticMatchingABS(List<T> objectsToScored, List<T> labelNodes, UiNode sourceNode) {
+    public ServerSemanticMatchingABS(List<T> objectsToScored, List<T> labelNodes, UiNode sourceNode) throws IOException {
         this.objectToScored = objectsToScored;
         this.sourceEvent = sourceNode.getAttributes();
         this.labelsNodes = labelNodes;
+        addFamilyAttributes(sourceNode);
     }
 
     public List<ScoredObject<M>> getScoredObjects() throws IOException {

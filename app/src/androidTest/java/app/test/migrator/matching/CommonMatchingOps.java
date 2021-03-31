@@ -5,11 +5,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import app.test.migrator.matching.server.ObjectSender;
 import app.test.migrator.matching.server.ScoredObject;
 import app.test.migrator.matching.server.ServerSemanticMatchingPairs;
 import app.test.migrator.matching.util.Event;
 import app.test.migrator.matching.util.Pair;
 import app.test.migrator.matching.util.State;
+import app.test.migrator.matching.util.Transition;
 import app.test.migrator.matching.util.uiautomator.BasicTreeNode;
 import app.test.migrator.matching.util.uiautomator.UiHierarchyXmlLoader;
 import app.test.migrator.matching.util.uiautomator.UiNode;
@@ -28,25 +30,36 @@ public class CommonMatchingOps {
                     "FrameLayout",
                     "Spinner");
 
-    static List<ScoredObject<Pair<Event, List<Double>>>> getDynamicCandidates(State currState,
-                                                                              Event event)
-            throws IOException {
-        UiNode node = event.getTargetElement();
-        return getDynamicCandidates(currState, node);
-    }
 
     static List<ScoredObject<Pair<Event, List<Double>>>> getDynamicCandidates(State currState, UiNode node) throws IOException {
         List<Pair<Event, List<Double>>> dynamicPairList = currState.getActionables();
         addActivityNameToEvents(dynamicPairList, currState);
         UiNode root = getRoot(currState);
         List<Pair<Event, List<Double>>> labels = findLabels(root, new ArrayList<Pair<Event, List<Double>>>());
-        return new ServerSemanticMatchingPairs(dynamicPairList, labels, node).getScoredObjects();
+        return new ServerSemanticMatchingPairs(dynamicPairList, labels, node, null).getScoredObjects();
     }
+
+    static List<ScoredObject<Pair<Event, List<Double>>>> getDynamicCandidates(State currState, Transition transition) throws IOException {
+        List<Pair<Event, List<Double>>> dynamicPairList = currState.getActionables();
+        addActivityNameToEvents(dynamicPairList, currState);
+        State sourceState = transition.getFrom();
+        UiNode sourceNode = transition.getLabel().first.getTargetElement();
+        ObjectSender.sendException(new Exception(sourceNode.getAttributes().toString()));
+        List<Pair<Event, List<Double>>> targetLabels = findLabels(currState, new ArrayList<Pair<Event, List<Double>>>());
+        List<Pair<Event, List<Double>>> sourceLabels = findLabels(sourceState, new ArrayList<Pair<Event, List<Double>>>());
+        return new ServerSemanticMatchingPairs(dynamicPairList, targetLabels, sourceNode, sourceLabels).getScoredObjects();
+    }
+
 
     private static void addActivityNameToEvents(List<Pair<Event, List<Double>>> dynamicPairList, State currState) {
         String activityName = currState.getFileName();
         dynamicPairList.forEach(x ->
                 x.first.getTargetElement().addAtrribute("activity", activityName));
+    }
+
+    static List<Pair<Event, List<Double>>> findLabels(State state, List<Pair<Event, List<Double>>> eventPairs) {
+        UiNode root = getRoot(state);
+        return findLabels(root, eventPairs);
     }
 
     private static List<Pair<Event, List<Double>>> findLabels(UiNode root, List<Pair<Event, List<Double>>> eventPairs) {
@@ -80,7 +93,7 @@ public class CommonMatchingOps {
                             testRecorderEvent = new Event("NONE", leaf.first, "", "0");
                     }
 
-                    if (testRecorderEvent != null &&!alreadyContainsClickable(testRecorderEvent, eventPairs)) {
+                    if (testRecorderEvent != null && !alreadyContainsClickable(testRecorderEvent, eventPairs)) {
                         List<UiNode> webkitNodes = new ArrayList<>();
                         findWebkitAncestors(testRecorderEvent.getTargetElement(), webkitNodes);
                         if (webkitNodes.size() < 1 && isLabelNode(leafType)) {
@@ -206,27 +219,9 @@ public class CommonMatchingOps {
     }
 
 
-    private static UiNode getRoot(State currState) {
+    private static UiNode getRoot(State state) {
         UiHierarchyXmlLoader xmlLoader = new UiHierarchyXmlLoader();
-        return (UiNode) xmlLoader.parseXml(currState.getGUIHierarchy());
-    }
-
-
-    public class MyTest {
-
-        private Activity getActivityInstance(){
-            final Activity[] currentActivity = {null};
-
-            getInstrumentation().runOnMainSync(new Runnable(){
-                public void run(){
-                    Collection<Activity> resumedActivity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED);
-                    Iterator<Activity> it = resumedActivity.iterator();
-                    currentActivity[0] = it.next();
-                }
-            });
-
-            return currentActivity[0];
-        }
+        return (UiNode) xmlLoader.parseXml(state.getGUIHierarchy());
     }
 
 }

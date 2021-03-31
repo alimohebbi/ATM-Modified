@@ -24,6 +24,7 @@ import java.io.FileWriter;
 import java.io.PrintWriter;
 import java.util.Collection;
 
+import java.util.Iterator;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
@@ -41,6 +42,7 @@ import java.io.InputStreamReader;
 import java.io.IOException;
 import java.io.File;
 import java.io.Writer;
+import java.util.stream.Collectors;
 
 import org.hamcrest.CoreMatchers;
 import org.json.JSONArray;
@@ -74,6 +76,7 @@ import static android.support.test.espresso.matcher.ViewMatchers.withId;
 import static android.support.test.espresso.matcher.ViewMatchers.withText;
 import static android.support.test.espresso.matcher.ViewMatchers.withXPath;
 import static android.support.test.runner.lifecycle.Stage.RESUMED;
+import static app.test.migrator.matching.CommonMatchingOps.findLabels;
 import static app.test.migrator.matching.CommonMatchingOps.getDynamicCandidates;
 import static org.hamcrest.CoreMatchers.anything;
 import static org.hamcrest.Matchers.allOf;
@@ -447,6 +450,8 @@ public class EventMatching {
             UiNode node = new UiNode();
             node.addAtrribute("text", stateNodeTargetElementText);
             node.addAtrribute("resource-id", stateNodeTargetElementId);
+            node.addAtrribute("class", staticNodeRel.second.getClazz());
+            node.addAtrribute("activity", staticNodeRel.first.getActivityName());
             uiNodeList.add(node);
         }
         return uiNodeList;
@@ -470,33 +475,36 @@ public class EventMatching {
         return alreadyVisited;
     }
 
-    private List<ScoredObject<UiNode>> getStaticCandidates(State currState,  Event event) throws IOException {
+    private List<ScoredObject<UiNode>> getStaticCandidates(State currState, Transition transition) throws IOException {
         List<UiNode> staticNodes = getStaticNodes(currState);
-        UiNode node = event.getTargetElement();
-        return new ServerSemanticMatchingNodes(staticNodes, node).getScoredObjects();
+        UiNode node = transition.getLabel().first.getTargetElement();
+        State sourceState = transition.getFrom();
+        List<Pair<Event, List<Double>>> sourceLabels = findLabels(sourceState, new ArrayList<Pair<Event, List<Double>>>());
+        List<UiNode> sourceNodeLabels = sourceLabels.stream().map(x -> x.first.getTargetElement())
+                .collect(Collectors.toList());
+        return new ServerSemanticMatchingNodes(staticNodes, node, sourceNodeLabels).getScoredObjects();
     }
 
     private Pair<Event, Boolean> findNextEvent(Transition transition, State currState) throws IOException {
         Event nextEvent;
-        Event event = transition.getLabel().first;
         List<Event> matchedEvents = new ArrayList<Event>();
-        List<ScoredObject<Pair<Event, List<Double>>>> scoredEvents = getDynamicCandidates(currState, event);
-        List<ScoredObject<UiNode>> scoredStaticNodes = getStaticCandidates(currState, event);
+        List<ScoredObject<Pair<Event, List<Double>>>> scoredEvents = getDynamicCandidates(currState, transition);
+        List<ScoredObject<UiNode>> scoredStaticNodes = getStaticCandidates(currState, transition);
 
-        double besDynamicScore=scoredEvents.get(0).getScore();
-        double bestStaticScore=scoredStaticNodes.get(0).getScore();
+        double besDynamicScore = scoredEvents.get(0).getScore();
+        double bestStaticScore = scoredStaticNodes.get(0).getScore();
 
-        if(besDynamicScore > bestStaticScore) {
-            if (scoredEvents.size()>=2)
+        if (besDynamicScore > bestStaticScore) {
+            if (scoredEvents.size() >= 2)
                 matchedEvents.add(scoredEvents.get(1).getObject().first);
             nextEvent = scoredEvents.get(0).getObject().first;
-            Map <String,String> signal = new HashMap<>();
+            Map<String, String> signal = new HashMap<>();
             signal.put("choice", "dynamic");
-            ObjectSender.sendObject(new JSONObject(signal),"exception");
+            ObjectSender.sendObject(new JSONObject(signal), "exception");
             return new Pair<Event, Boolean>(nextEvent, true);
         } else {
             String id = scoredStaticNodes.get(0).getObject().getAttribute("resource-id");
-            ObjectSender.sendObject(new JSONObject(scoredStaticNodes.get(0).getObject().getAttributes()),"exception");
+            ObjectSender.sendObject(new JSONObject(scoredStaticNodes.get(0).getObject().getAttributes()), "exception");
             nextEvent = findStaticNextEvent(currState, id);
             if (nextEvent != null) {
                 return new Pair<Event, Boolean>(nextEvent, false);
@@ -730,8 +738,7 @@ public class EventMatching {
                                        List<Triple<String, State, Event>> targetEvents_temp)
             throws IOException {
         boolean matched = false;
-        Event event = transition.getLabel().first;
-        List<ScoredObject<Pair<Event, List<Double>>>> scoredEvents = getDynamicCandidates(currState, event);
+        List<ScoredObject<Pair<Event, List<Double>>>> scoredEvents = getDynamicCandidates(currState, transition);
 
         for (int index = 0; index < scoredEvents.size(); index++) {
             Pair<Event, List<Double>> stateNode = scoredEvents.get(index).getObject();
@@ -2047,10 +2054,23 @@ public class EventMatching {
         return mode;
     }
 
+    private List<String> getSourceActivities() throws IOException {
+        BufferedReader reader = null;
+        List<String> activityNames = new ArrayList<>();
+        reader = new BufferedReader(
+                new InputStreamReader(InstrumentationRegistry.getTargetContext().getResources().getAssets().open("activity_names"), "UTF-8"));
+
+        String mLine;
+        while ((mLine = reader.readLine()) != null) {
+            activityNames.add(mLine);
+        }
+        return activityNames;
+    }
+
     private void getSourceAppScenarios() throws Exception {
         InputStream scenariosInputStream = InstrumentationRegistry.getTargetContext().getResources().getAssets().open("source-scenarios/" + scenarioName);
         scenario = new FiniteStateMachine();
-
+        Iterator<String> activityNames = getSourceActivities().iterator();
         if (scenariosInputStream != null) {
             try (BufferedReader br = new BufferedReader(new InputStreamReader(scenariosInputStream, "UTF8"))) {
                 Event prevEvent = null;
@@ -2173,12 +2193,13 @@ public class EventMatching {
                         scenario.addState(to);
                         updateCheckBoxText(rootFrom);
 
+
                         if (nodes.size() > 0 && node == null) node = nodes.get(0);
 
                         if (node != null && !type.equals("PRESS_BACK")) {
                             String replacementText = determineLabelAndReplacementText(rootFrom, action, type, node, false);
                             Event event = new Event(type, node, replacementText, "0");
-
+                            node.addAtrribute("activity", activityNames.next());
                             if (!type.equals("VIEW_CLICKED") || !node.getAttribute("class").contains("EditText")) {
                                 scenario.addTransition(from, to, new Triple<>(event, false, 0.0));
                                 if ((prevEvent == null || !prevEvent.getType().equals("VIEW_TEXT_CHANGED")) && !type.equals("VIEW_TEXT_CHANGED"))
@@ -2187,6 +2208,7 @@ public class EventMatching {
                             prevEvent = event;
                         } else {
                             Event event = new Event(type, new UiNode(), "", "0");
+                            event.getTargetElement().addAtrribute("activity", activityNames.next());
                             scenario.addTransition(from, to, new Triple<>(event, false, 0.0));
                             prevEvent = event;
                         }

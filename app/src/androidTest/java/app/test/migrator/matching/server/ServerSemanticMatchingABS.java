@@ -13,20 +13,23 @@ import static app.test.migrator.matching.server.ObjectSender.sendDescriptors;
 
 public abstract class ServerSemanticMatchingABS<T, M> {
     List<T> objectToScored = null;
-    List<T> labelsNodes = null;
+    List<T> targetLabels = null;
+    List<T> sourceLabels = null;
     Map<String, String> sourceEvent = null;
 
-    public ServerSemanticMatchingABS(List<T> objectsToScored, List<T> labelNodes, UiNode sourceNode) throws IOException {
+    public ServerSemanticMatchingABS(List<T> objectsToScored, List<T> targetLabels, UiNode sourceNode, List<T> sourceLabels) throws IOException {
         this.objectToScored = objectsToScored;
         this.sourceEvent = sourceNode.getAttributes();
-        this.labelsNodes = labelNodes;
+        this.targetLabels = targetLabels;
+        this.sourceLabels = sourceLabels;
         addFamilyAttributes(sourceNode);
     }
 
     public List<ScoredObject<M>> getScoredObjects() throws IOException {
         Map<Integer, Map<String, String>> candidates = convertListToMap(this.objectToScored);
-        Map<Integer, Map<String, String>> labelNodes = convertListToMap(this.labelsNodes);
-        MatchObject matchObject = new MatchObject(candidates, labelNodes, sourceEvent);
+        Map<Integer, Map<String, String>> targetLabelsMap = convertListToMap(this.targetLabels);
+        Map<Integer, Map<String, String>> sourceLabelsMap = convertListToMap(this.sourceLabels);
+        MatchObject matchObject = new MatchObject(candidates, targetLabelsMap, sourceEvent, sourceLabelsMap);
         String jsonString = new ObjectMapper().writeValueAsString(matchObject);
         Map<String, Double> orderedIndex = sendDescriptors(jsonString);
         return getOrderedObject(orderedIndex);

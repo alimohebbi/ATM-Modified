@@ -14,9 +14,10 @@ import static app.test.migrator.matching.CommonMatchingOps.addFamilyAttributes;
 public class ServerSemanticMatchingPairs extends ServerSemanticMatchingABS<Pair<Event, List<Double>>, Pair<Event, List<Double>>> {
     public ServerSemanticMatchingPairs(
             List<Pair<Event, List<Double>>> objectToScored,
-            List<Pair<Event, List<Double>>> labelNodes,
-            UiNode sourceNode) throws IOException {
-        super(objectToScored,labelNodes, sourceNode);
+            List<Pair<Event, List<Double>>> targetLabels,
+            UiNode sourceNode,
+            List<Pair<Event, List<Double>>> sourceLabels) throws IOException {
+        super(objectToScored,targetLabels, sourceNode, sourceLabels);
     }
 
     @Override

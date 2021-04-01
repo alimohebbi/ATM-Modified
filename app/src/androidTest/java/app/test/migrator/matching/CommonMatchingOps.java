@@ -19,7 +19,7 @@ import app.test.migrator.matching.util.uiautomator.UiNode;
 public class CommonMatchingOps {
 
     private static final List<String> labels =
-            Arrays.asList("TextView", "DialogTitle", "ImageView", "IconTextView");
+            Arrays.asList("TextView", "DialogTitle", "ImageView", "IconTextView", "TextInputLayout");
     private static final List<String> complex =
             Arrays.asList("android.support.v7.widget.RecyclerView",
                     "android.support.v7.widget.RecyclerView",
@@ -96,7 +96,7 @@ public class CommonMatchingOps {
                     if (testRecorderEvent != null && !alreadyContainsClickable(testRecorderEvent, eventPairs)) {
                         List<UiNode> webkitNodes = new ArrayList<>();
                         findWebkitAncestors(testRecorderEvent.getTargetElement(), webkitNodes);
-                        if (webkitNodes.size() < 1 && isLabelNode(leafType)) {
+                        if (webkitNodes.size() < 1 && isLabelNode(leaf.first)) {
                             List<Double> indexes = new ArrayList<>();
                             eventPairs.add(new Pair<>(testRecorderEvent, indexes));
                         }
@@ -111,7 +111,7 @@ public class CommonMatchingOps {
                 List<Double> indexes = new ArrayList<>();
                 List<UiNode> webkitNodes = new ArrayList<>();
                 findWebkitAncestors(testRecorderEvent.getTargetElement(), webkitNodes);
-                if (webkitNodes.size() < 1 && isLabelNode(type)) {
+                if (webkitNodes.size() < 1 && isLabelNode(node)) {
                     eventPairs.add(new Pair<>(testRecorderEvent, indexes));
                 }
             }
@@ -187,8 +187,12 @@ public class CommonMatchingOps {
         return typeContainsOneOf(type, complex);
     }
 
-    private static boolean isLabelNode(String type) {
-        return typeEndsWithOneOf(type, labels);
+    private static boolean isLabelNode(UiNode node) {
+        String type = node.getAttribute("class");
+        if (!node.getAttribute("text").equals("") ||
+                !node.getAttribute("content-desc").equals(""))
+            return typeEndsWithOneOf(type, labels);
+        return false;
     }
 
     private static String getText(UiNode node) {
@@ -200,6 +204,8 @@ public class CommonMatchingOps {
 
     public static void addFamilyAttributes(UiNode node) throws IOException {
         UiNode parent = (UiNode) node.getParent();
+        if (parent == null)
+            return;
         String parentText = parent.getAttribute("text");
         String nodeText = node.getAttribute("text");
         List<BasicTreeNode> childrenList = parent.getChildrenList();
@@ -213,9 +219,9 @@ public class CommonMatchingOps {
         }
         if (sibling != null) {
             String siblingText = sibling.getAttribute("text");
-            node.addAtrribute("parent_text", parentText);
             node.addAtrribute("sibling_text", siblingText);
         }
+        node.addAtrribute("parent_text", parentText);
     }
 
 

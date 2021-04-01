@@ -2278,7 +2278,8 @@ public class EventMatching {
             }
         }
 
-        if (node != null && text.length() > 0) node.addAtrribute("text", text.toString());
+//        if (node != null && text.length() > 0)
+//            node.addAtrribute("text", text.toString());
 
         if (node == null) {
             String clazz = getClassOfNode(fileNameFrom);
@@ -2297,7 +2298,8 @@ public class EventMatching {
                 }
 
                 if (count != 1) node = null;
-                else if (text.length() > 0) node.addAtrribute("text", text.toString());
+//                else if (text.length() > 0)
+//                    node.addAtrribute("text", text.toString());
             }
         }
 
@@ -2341,7 +2343,7 @@ public class EventMatching {
     }
 
     private void updateCheckBoxText(UiNode root) {
-        BasicTreeNode[] nodes = root.getChildren();
+      /*  BasicTreeNode[] nodes = root.getChildren();
 
         for (int index = 0; index < nodes.length; index++) {
             UiNode node = (UiNode) nodes[index];
@@ -2373,7 +2375,7 @@ public class EventMatching {
             }
 
             updateCheckBoxText(node);
-        }
+        }*/
     }
 
     private String transformActionToEventType(String action) {

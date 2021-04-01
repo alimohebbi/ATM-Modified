@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
@@ -22,8 +23,11 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 public class ObjectSender {
-
-    private static OkHttpClient client = new OkHttpClient.Builder().authenticator(new Authenticator() {
+    static long duration = 20;
+    private static OkHttpClient client = new OkHttpClient.Builder()
+            .connectTimeout(duration, TimeUnit.MINUTES)
+            .readTimeout(duration, TimeUnit.MINUTES)
+            .authenticator(new Authenticator() {
         public Request authenticate(Route route, Response response) throws IOException {
             String credential = Credentials.basic("neo4j", "neo4j");
             return response.request().newBuilder().header("Authorization", credential).build();

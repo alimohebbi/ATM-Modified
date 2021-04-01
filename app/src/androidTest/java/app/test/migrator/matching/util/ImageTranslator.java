@@ -84,7 +84,7 @@ public class ImageTranslator {
 
                         String newText = "";
                         newText = drawableName.replaceAll("\\d","");
-                        node.setAttribute("src", drawableName);
+                        node.setAttribute("file_name", drawableName);
                         if(node.getAttribute("class").contains("CheckBox")){
                             System.out.println("Debug: %%%%class%%%% " + node.getAttribute("class"));
                             node.setAttribute("class", "android.widget.ImageButton");
@@ -92,9 +92,9 @@ public class ImageTranslator {
 
                         String textOrContentDesc = node.getAttribute("textOrContentDesc");
                         if (textOrContentDesc == null || textOrContentDesc.equals(""))    textOrContentDesc = node.getAttribute("content-desc");
-                        if(textOrContentDesc != null && textOrContentDesc.equals("") && !newText.equals("")){
-                            node.setAttribute("text", newText);
-                        }
+//                        if(textOrContentDesc != null && textOrContentDesc.equals("") && !newText.equals("")){
+//                            node.setAttribute("text", newText);
+//                        }
 
                         fileChanged = true;
                     }

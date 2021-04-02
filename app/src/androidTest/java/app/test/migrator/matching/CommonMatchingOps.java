@@ -206,19 +206,19 @@ public class CommonMatchingOps {
         UiNode parent = (UiNode) node.getParent();
         if (parent == null)
             return;
-        String parentText = parent.getAttribute("text");
-        String nodeText = node.getAttribute("text");
+        String parentText = getText(parent);
+        String nodeText = getText(node);
         List<BasicTreeNode> childrenList = parent.getChildrenList();
         UiNode sibling = null;
         for (BasicTreeNode child : childrenList) {
             sibling = (UiNode) child;
-            String siblingText = node.getAttribute("text");
+            String siblingText = getText(sibling);
             if (!siblingText.equals(nodeText))
                 break;
             sibling = null;
         }
         if (sibling != null) {
-            String siblingText = sibling.getAttribute("text");
+            String siblingText = getText(sibling);
             node.addAtrribute("sibling_text", siblingText);
         }
         node.addAtrribute("parent_text", parentText);

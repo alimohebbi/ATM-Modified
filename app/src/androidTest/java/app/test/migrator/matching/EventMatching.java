@@ -42,7 +42,6 @@ import java.io.InputStreamReader;
 import java.io.IOException;
 import java.io.File;
 import java.io.Writer;
-import java.util.stream.Collectors;
 
 import org.hamcrest.CoreMatchers;
 import org.json.JSONArray;
@@ -480,9 +479,16 @@ public class EventMatching {
         UiNode node = transition.getLabel().first.getTargetElement();
         State sourceState = transition.getFrom();
         List<Pair<Event, List<Double>>> sourceLabels = findLabels(sourceState, new ArrayList<Pair<Event, List<Double>>>());
-        List<UiNode> sourceNodeLabels = sourceLabels.stream().map(x -> x.first.getTargetElement())
-                .collect(Collectors.toList());
+        List<UiNode> sourceNodeLabels = getNodesFromPairs(sourceLabels);
         return new ServerSemanticMatchingNodes(staticNodes, node, sourceNodeLabels).getScoredObjects();
+    }
+
+    private List<UiNode> getNodesFromPairs(List<Pair<Event, List<Double>>> sourceLabels) {
+        List<UiNode> result = new ArrayList<>();
+        for(Pair<Event, List<Double>> pair:sourceLabels) {
+            result.add(pair.first.getTargetElement());
+        }
+        return result;
     }
 
     private Pair<Event, Boolean> findNextEvent(Transition transition, State currState) throws IOException {
@@ -494,7 +500,7 @@ public class EventMatching {
         double besDynamicScore = scoredEvents.get(0).getScore();
         double bestStaticScore = scoredStaticNodes.get(0).getScore();
 
-        if (besDynamicScore > bestStaticScore) {
+        if (besDynamicScore >= bestStaticScore) {
             if (scoredEvents.size() >= 2)
                 matchedEvents.add(scoredEvents.get(1).getObject().first);
             nextEvent = scoredEvents.get(0).getObject().first;
@@ -804,6 +810,7 @@ public class EventMatching {
                     if (!targetEvent.equals("")) {
                         targetEvents_temp.add(new Triple<String, State, Event>(targetEvent + "~RANDOM", currState, new Event()));
                         matched = true;
+                        break;
                     }
                 }
             }
@@ -2208,7 +2215,7 @@ public class EventMatching {
                             prevEvent = event;
                         } else {
                             Event event = new Event(type, new UiNode(), "", "0");
-                            event.getTargetElement().addAtrribute("activity", activityNames.next());
+//                            event.getTargetElement().addAtrribute("activity", activityNames.next());
                             scenario.addTransition(from, to, new Triple<>(event, false, 0.0));
                             prevEvent = event;
                         }

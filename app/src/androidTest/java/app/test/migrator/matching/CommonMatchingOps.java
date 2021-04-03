@@ -53,8 +53,9 @@ public class CommonMatchingOps {
 
     private static void addActivityNameToEvents(List<Pair<Event, List<Double>>> dynamicPairList, State currState) {
         String activityName = currState.getFileName();
-        dynamicPairList.forEach(x ->
-                x.first.getTargetElement().addAtrribute("activity", activityName));
+        for (Pair<Event, List<Double>> pair:dynamicPairList) {
+            pair.first.getTargetElement().addAtrribute("activity", activityName);
+        }
     }
 
     static List<Pair<Event, List<Double>>> findLabels(State state, List<Pair<Event, List<Double>>> eventPairs) {

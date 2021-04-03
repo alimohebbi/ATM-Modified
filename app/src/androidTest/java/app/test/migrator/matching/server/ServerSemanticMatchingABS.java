@@ -58,7 +58,12 @@ public abstract class ServerSemanticMatchingABS<T, M> {
             ScoredObject<M> scoredObject = getWrappedScoredObject(orderedIndex, index);
             orderedObjects.add(scoredObject);
         }
-        orderedObjects.sort(Comparator.comparing(ScoredObject<M>::getScore).reversed());
+        Collections.sort(orderedObjects, new Comparator<ScoredObject<M>>() {
+            @Override
+            public int compare(ScoredObject<M> o1, ScoredObject<M> o2) {
+                return o1.getScore().compareTo(o2.getScore());
+            }
+        }.reversed());
         return orderedObjects;
     }
 

@@ -2285,9 +2285,10 @@ public class EventMatching {
             }
         }
 
-//        if (node != null && text.length() > 0)
-//            node.addAtrribute("text", text.toString());
-
+        if (node != null && text.length() > 0) {
+            addOriginalText(node);
+            node.addAtrribute("text", text.toString());
+        }
         if (node == null) {
             String clazz = getClassOfNode(fileNameFrom);
             if (clazz.length() > 0) {
@@ -2305,12 +2306,21 @@ public class EventMatching {
                 }
 
                 if (count != 1) node = null;
-//                else if (text.length() > 0)
-//                    node.addAtrribute("text", text.toString());
+                else if (text.length() > 0) {
+                    addOriginalText(node);
+                    node.addAtrribute("text", text.toString());
+                }
             }
         }
 
         return node;
+    }
+
+    private void addOriginalText(UiNode node) {
+        String originalText = node.getAttribute("text");
+        if (originalText == null)
+            originalText = "";
+        node.addAtrribute("original_text", "*" + originalText);
     }
 
     private List<String> getTextOfNode(String fileNameFrom) throws Exception {
@@ -2350,7 +2360,7 @@ public class EventMatching {
     }
 
     private void updateCheckBoxText(UiNode root) {
-      /*  BasicTreeNode[] nodes = root.getChildren();
+     /*   BasicTreeNode[] nodes = root.getChildren();
 
         for (int index = 0; index < nodes.length; index++) {
             UiNode node = (UiNode) nodes[index];

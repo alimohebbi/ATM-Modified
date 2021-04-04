@@ -485,7 +485,7 @@ public class EventMatching {
 
     private List<UiNode> getNodesFromPairs(List<Pair<Event, List<Double>>> sourceLabels) {
         List<UiNode> result = new ArrayList<>();
-        for(Pair<Event, List<Double>> pair:sourceLabels) {
+        for (Pair<Event, List<Double>> pair : sourceLabels) {
             result.add(pair.first.getTargetElement());
         }
         return result;
@@ -504,13 +504,9 @@ public class EventMatching {
             if (scoredEvents.size() >= 2)
                 matchedEvents.add(scoredEvents.get(1).getObject().first);
             nextEvent = scoredEvents.get(0).getObject().first;
-            Map<String, String> signal = new HashMap<>();
-            signal.put("choice", "dynamic");
-            ObjectSender.sendObject(new JSONObject(signal), "exception");
             return new Pair<Event, Boolean>(nextEvent, true);
         } else {
             String id = scoredStaticNodes.get(0).getObject().getAttribute("resource-id");
-            ObjectSender.sendObject(new JSONObject(scoredStaticNodes.get(0).getObject().getAttributes()), "exception");
             nextEvent = findStaticNextEvent(currState, id);
             if (nextEvent != null) {
                 return new Pair<Event, Boolean>(nextEvent, false);
@@ -2360,7 +2356,7 @@ public class EventMatching {
     }
 
     private void updateCheckBoxText(UiNode root) {
-     /*   BasicTreeNode[] nodes = root.getChildren();
+        BasicTreeNode[] nodes = root.getChildren();
 
         for (int index = 0; index < nodes.length; index++) {
             UiNode node = (UiNode) nodes[index];
@@ -2387,12 +2383,12 @@ public class EventMatching {
                     else if (prevNode.getAttribute("content-desc") != null)
                         textOrDesc.append(prevNode.getAttribute("content-desc")).append(" ");
                 }
-
+                addOriginalText(node);
                 node.addAtrribute("text", textOrDesc.toString());
             }
 
             updateCheckBoxText(node);
-        }*/
+        }
     }
 
     private String transformActionToEventType(String action) {

@@ -50,6 +50,7 @@ import org.junit.runner.RunWith;
 
 import android.support.test.uiautomator.UiDevice;
 
+import app.test.migrator.matching.server.ObjectSender;
 import app.test.migrator.matching.server.ScoredObject;
 import app.test.migrator.matching.util.*;
 import app.test.migrator.matching.util.uiautomator.*;
@@ -182,6 +183,7 @@ public class AssertionMatching {
     }
 
     private String generateAssertionCode(Assertion assertion) {
+        ObjectSender.sendException(new Exception(assertion.toString()));
         StringBuilder assertionCode = new StringBuilder();
         String assertionTargetElement = selectAssertionTargetElement(assertion.getTargetElement());
         if (!assertionTargetElement.equals("")) {

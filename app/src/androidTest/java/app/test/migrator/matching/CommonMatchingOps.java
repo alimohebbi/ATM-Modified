@@ -44,7 +44,6 @@ public class CommonMatchingOps {
         addActivityNameToEvents(dynamicPairList, currState);
         State sourceState = transition.getFrom();
         UiNode sourceNode = transition.getLabel().first.getTargetElement();
-        ObjectSender.sendException(new Exception(sourceNode.getAttributes().toString()));
         List<Pair<Event, List<Double>>> targetLabels = findLabels(currState, new ArrayList<Pair<Event, List<Double>>>());
         List<Pair<Event, List<Double>>> sourceLabels = findLabels(sourceState, new ArrayList<Pair<Event, List<Double>>>());
         return new ServerSemanticMatchingPairs(dynamicPairList, targetLabels, sourceNode, sourceLabels).getScoredObjects();

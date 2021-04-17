@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.*;
 
+import app.test.migrator.matching.EventMatching;
 import app.test.migrator.matching.util.uiautomator.UiNode;
 
 import static app.test.migrator.matching.CommonMatchingOps.addFamilyAttributes;

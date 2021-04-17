@@ -77,6 +77,7 @@ import static android.support.test.espresso.matcher.ViewMatchers.withXPath;
 import static android.support.test.runner.lifecycle.Stage.RESUMED;
 import static app.test.migrator.matching.CommonMatchingOps.findLabels;
 import static app.test.migrator.matching.CommonMatchingOps.getDynamicCandidates;
+import static java.lang.Thread.sleep;
 import static org.hamcrest.CoreMatchers.anything;
 import static org.hamcrest.Matchers.allOf;
 
@@ -2057,6 +2058,22 @@ public class EventMatching {
         return mode;
     }
 
+    public static String getSemanticConfig() throws IOException {
+        BufferedReader reader = null;
+        StringBuilder sm = new StringBuilder();
+
+        reader = new BufferedReader(
+                new InputStreamReader(InstrumentationRegistry.getTargetContext().getResources().getAssets().open("sm_config"), "UTF-8"));
+        String mLine;
+
+            while ((mLine = reader.readLine()) != null) {
+                sm.append(mLine);
+                sm.append(" ");
+            }
+
+        return sm.toString();
+    }
+
     private List<String> getSourceActivities() throws IOException {
         BufferedReader reader = null;
         List<String> activityNames = new ArrayList<>();
@@ -2102,6 +2119,8 @@ public class EventMatching {
                         findEditTextNodes(rootFrom, fromEditTexts);
 
                         String fileNameTo = line.substring(line.indexOf('>') + 1, line.indexOf('['));
+
+
                         State to;
                         UiNode rootTo;
                         List<UiNode> toEditTexts = new ArrayList<>();
@@ -2125,7 +2144,15 @@ public class EventMatching {
                         if (id.equals("0")) {
                             if (id.equals("0")) id = "";
                         }
-
+                        HashMap<String, String> objToSend = new HashMap<>();
+                        objToSend.put("from", fileNameFrom);
+                        objToSend.put("to", fileNameTo);
+                        objToSend.put("fromXml", fromXMLPath);
+                        objToSend.put("action", action);
+                        objToSend.put("targetElement", targetElement);
+                        objToSend.put("id", id);
+                        ObjectSender.sendObject(new JSONObject(objToSend), "exception");
+                        sleep(2000);
                         if (action.contains("load adapter data") || action.contains("Handle transition")
                                 || action.contains("scroll to") || action.contains("input method editor"))
                             continue;
@@ -2189,6 +2216,7 @@ public class EventMatching {
                                 }
                             } catch (IOException ex) {
                                 //file does not exist, do nothing
+                                ObjectSender.sendException(new Exception("File does not exit"));
                             }
                         }
 

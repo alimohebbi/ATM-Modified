@@ -118,6 +118,7 @@ public class AssertionMatching {
     private LemmatizationAndPOSTagger lemmatizationAndPOSTagger = new LemmatizationAndPOSTagger();
     private int lastVisitedTransitionIndex;
     private List<Assertion> assertions = new ArrayList<Assertion>();
+    public static String smConfig = null;
 
     @Rule
     public ActivityTestRule activityRule = new ActivityTestRule(cl);
@@ -129,6 +130,7 @@ public class AssertionMatching {
 
         mDevice = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
 
+        smConfig = getSemanticConfig();
         getSourceAppAssertions();
 
         createIdImageDict("image_dict", true);
@@ -1726,6 +1728,35 @@ public class AssertionMatching {
         return mode;
     }
 
+    private String getSemanticConfig() throws IOException {
+        BufferedReader reader = null;
+        StringBuilder sm = new StringBuilder();
+
+        reader = new BufferedReader(
+                new InputStreamReader(InstrumentationRegistry.getTargetContext().getResources().getAssets().open("sm_config"), "UTF-8"));
+        String mLine;
+
+        while ((mLine = reader.readLine()) != null) {
+            sm.append(mLine);
+            sm.append(" ");
+        }
+
+        return sm.toString();
+    }
+
+    private List<String> getSourceActivities() throws IOException {
+        BufferedReader reader = null;
+        List<String> activityNames = new ArrayList<>();
+        reader = new BufferedReader(
+                new InputStreamReader(InstrumentationRegistry.getTargetContext().getResources().getAssets().open("activity_names"), "UTF-8"));
+
+        String mLine;
+        while ((mLine = reader.readLine()) != null) {
+            activityNames.add(mLine);
+        }
+        return activityNames;
+    }
+
     private void getSourceAppAssertions() throws Exception {
         InputStream scenariosInputStream = InstrumentationRegistry.getTargetContext().getResources().getAssets().open("source-scenarios/" + scenarioName);
         scenario = new FiniteStateMachine();
@@ -1784,6 +1815,9 @@ public class AssertionMatching {
                             }
                             count++;
                         }
+                        String lastActivity = getSourceActivities().get(getSourceActivities().size()-1);
+                        if (targetElement!=null)
+                            targetElement.addAtrribute("activity",lastActivity);
                         assertions.add(new Assertion(targetElement, assertionMethod, assertionMatchers));
                     }
                 }

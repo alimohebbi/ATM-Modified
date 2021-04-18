@@ -116,7 +116,7 @@ public class EventMatching {
     }).build();
     private String staticNodeType = "ACT";
     private LemmatizationAndPOSTagger lemmatizationAndPOSTagger = new LemmatizationAndPOSTagger();
-
+    public static String smConfig = null;
     @Rule
     public ActivityTestRule activityRule = new ActivityTestRule(cl);
 
@@ -125,10 +125,18 @@ public class EventMatching {
         Intents.init();
         intending(CoreMatchers.not(isInternal())).respondWith(new Instrumentation.ActivityResult(0, null));
 
+        smConfig = getSemanticConfig();
         getSourceAppScenarios();
+        checkScenarios();
 
         createIdImageDict("image_dict", true);
         createIdImageDict("inputType_dict", false);
+    }
+
+    private void checkScenarios() throws Exception {
+        Event event = scenario.getTransitions().get(0).getLabel().first;
+        if (event.getTargetElement().getAttributes().size() == 0)
+            throw new Exception("Source events are malformed");
     }
 
     private void createIdImageDict(String name, Boolean isImageDict) throws IOException {
@@ -494,26 +502,47 @@ public class EventMatching {
 
     private Pair<Event, Boolean> findNextEvent(Transition transition, State currState) throws IOException {
         Event nextEvent;
-        List<Event> matchedEvents = new ArrayList<Event>();
         List<ScoredObject<Pair<Event, List<Double>>>> scoredEvents = getDynamicCandidates(currState, transition);
         List<ScoredObject<UiNode>> scoredStaticNodes = getStaticCandidates(currState, transition);
-
-        double besDynamicScore = scoredEvents.get(0).getScore();
-        double bestStaticScore = scoredStaticNodes.get(0).getScore();
-
-        if (besDynamicScore >= bestStaticScore) {
-            if (scoredEvents.size() >= 2)
-                matchedEvents.add(scoredEvents.get(1).getObject().first);
+        scoredStaticNodes = keepBestCandidates(scoredStaticNodes);
+        double besDynamicScore = scoredEvents.size() > 0 ? scoredEvents.get(0).getScore() : -10;
+        if (besDynamicScore >= -10) {
+            addOtherBestEventsToQueue(transition, scoredEvents);
             nextEvent = scoredEvents.get(0).getObject().first;
             return new Pair<Event, Boolean>(nextEvent, true);
         } else {
-            String id = scoredStaticNodes.get(0).getObject().getAttribute("resource-id");
-            nextEvent = findStaticNextEvent(currState, id);
-            if (nextEvent != null) {
-                return new Pair<Event, Boolean>(nextEvent, false);
+            for (int i = 0; i < scoredStaticNodes.size(); i++) {
+                String id = scoredStaticNodes.get(i).getObject().getAttribute("resource-id");
+                nextEvent = findStaticNextEvent(currState, id);
+                if (nextEvent != null) {
+                    return new Pair<Event, Boolean>(nextEvent, false);
+                }
             }
         }
         return null;
+    }
+
+    private List<ScoredObject<UiNode>> keepBestCandidates(List<ScoredObject<UiNode>> scoredStaticNodes) {
+        if (scoredStaticNodes.size() == 0)
+            return scoredStaticNodes;
+        List<ScoredObject<UiNode>> results = new ArrayList<>();
+        double bestScore = scoredStaticNodes.get(0).getScore();
+        for (int i = 0; i < scoredStaticNodes.size(); i++) {
+            if (scoredStaticNodes.get(i).getScore() == bestScore)
+                results.add(scoredStaticNodes.get(i));
+        }
+        return results;
+    }
+
+    private void addOtherBestEventsToQueue(Transition transition, List<ScoredObject<Pair<Event, List<Double>>>> scoredEvents) {
+        List<Event> matchedEvents = new ArrayList<Event>();
+        double besDynamicScore = scoredEvents.get(0).getScore();
+        if (scoredEvents.size() >= 2) {
+            for (int i = 1; i < scoredEvents.size(); i++)
+                if (scoredEvents.get(i).getScore() == besDynamicScore)
+                    matchedEvents.add(scoredEvents.get(i).getObject().first);
+        }
+        matchedEvents_map.put(transition, matchedEvents);
     }
 
     //  Compare text to text, id to id, cross then weighted max
@@ -2058,7 +2087,7 @@ public class EventMatching {
         return mode;
     }
 
-    public static String getSemanticConfig() throws IOException {
+    private String getSemanticConfig() throws IOException {
         BufferedReader reader = null;
         StringBuilder sm = new StringBuilder();
 
@@ -2066,10 +2095,10 @@ public class EventMatching {
                 new InputStreamReader(InstrumentationRegistry.getTargetContext().getResources().getAssets().open("sm_config"), "UTF-8"));
         String mLine;
 
-            while ((mLine = reader.readLine()) != null) {
-                sm.append(mLine);
-                sm.append(" ");
-            }
+        while ((mLine = reader.readLine()) != null) {
+            sm.append(mLine);
+            sm.append(" ");
+        }
 
         return sm.toString();
     }
@@ -2144,7 +2173,7 @@ public class EventMatching {
                         if (id.equals("0")) {
                             if (id.equals("0")) id = "";
                         }
-                        HashMap<String, String> objToSend = new HashMap<>();
+      /*                  HashMap<String, String> objToSend = new HashMap<>();
                         objToSend.put("from", fileNameFrom);
                         objToSend.put("to", fileNameTo);
                         objToSend.put("fromXml", fromXMLPath);
@@ -2152,7 +2181,8 @@ public class EventMatching {
                         objToSend.put("targetElement", targetElement);
                         objToSend.put("id", id);
                         ObjectSender.sendObject(new JSONObject(objToSend), "exception");
-                        sleep(2000);
+                        try{sleep(2000);} catch (Exception e) { e.printStackTrace();}
+*/
                         if (action.contains("load adapter data") || action.contains("Handle transition")
                                 || action.contains("scroll to") || action.contains("input method editor"))
                             continue;

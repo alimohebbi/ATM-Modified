@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import app.test.migrator.matching.AssertionMatching;
 import app.test.migrator.matching.EventMatching;
 
 public class MatchObject {
@@ -11,15 +12,16 @@ public class MatchObject {
     private Map<Integer, Map<String, String>> targetLabels;
     private Map<Integer, Map<String, String>> sourceLabels;
     private Map<String, String> sourceEvent;
-    private Map<String, String> smConfig;
+    private String smConfig;
 
-    public Map<String, String> getSmConfig() {
+    public String getSmConfig() {
         return smConfig;
     }
 
-    public void setSmConfig(Map<String, String> smConfig) {
+    public void setSmConfig(String smConfig) {
         this.smConfig = smConfig;
     }
+
 
     public MatchObject(Map<Integer, Map<String, String>> candidates,
                        Map<Integer, Map<String, String>> targetLabels,
@@ -29,8 +31,7 @@ public class MatchObject {
         this.targetLabels = targetLabels;
         this.sourceEvent = sourceEvent;
         this.sourceLabels = sourceLabels;
-        this.smConfig = new HashMap<>();
-        this.smConfig.put("smConfig", EventMatching.getSemanticConfig());
+        this.smConfig = EventMatching.smConfig != null ? EventMatching.smConfig : AssertionMatching.smConfig;
     }
 
     public Map<Integer, Map<String, String>> getTargetLabels() {

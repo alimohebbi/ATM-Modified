@@ -506,7 +506,7 @@ public class EventMatching {
         List<ScoredObject<UiNode>> scoredStaticNodes = getStaticCandidates(currState, transition);
         scoredStaticNodes = keepBestCandidates(scoredStaticNodes);
         double besDynamicScore = scoredEvents.size() > 0 ? scoredEvents.get(0).getScore() : -10;
-        if (besDynamicScore >= -10) {
+        if (besDynamicScore > -10) {
             addOtherBestEventsToQueue(transition, scoredEvents);
             nextEvent = scoredEvents.get(0).getObject().first;
             return new Pair<Event, Boolean>(nextEvent, true);
